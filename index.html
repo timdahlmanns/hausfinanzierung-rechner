@@ -718,7 +718,7 @@ function computeModel(p) {
             totalOutlayBS, totalOutlayEigen, gesamtMonateBS, gesamtMonateEigen, npvPhasesBS, npvPhasesEigen,
             initialPaidInPeriod: pmt_init * zinsbindungMonate, totalSparEinzahlungenEigen,
             fvEigenFinal: fvEigenAtZB, eigenSparMonate: zinsbindungMonate,
-            zwischen: { schedule: zwischenResult.schedule, zinsenTotal: zwischenResult.zinsenTotal, monate: zwischenMonate, restschuld: zwischenRestschuld, pmt: pmt_init },
+            zwischen: { schedule: zwischenResult.schedule, paidTotal: zwischenPaidTotal, zinsenTotal: zwischenResult.zinsenTotal, monate: zwischenMonate, restschuld: zwischenRestschuld, pmt: pmt_init },
             park: null
         });
     } else { // Fall C
@@ -852,7 +852,7 @@ function renderScheduleTable(schedule) {
     return html;
 }
 
-function updateBarChart(initialPaid, sparraten, bsDarlehen, bsZinsen, zwischenZinsen, bsGap, eigenGap, eigenZinsen) {
+function updateBarChart(initialPaid, sparraten, bsDarlehen, bsZinsen, zwischenAufwand, bsGap, eigenGap, eigenZinsen) {
     const ctx = document.getElementById('barChart').getContext('2d');
     if (barChart) barChart.destroy();
     barChart = new Chart(ctx, {
@@ -863,7 +863,7 @@ function updateBarChart(initialPaid, sparraten, bsDarlehen, bsZinsen, zwischenZi
                 { label: 'Gezahlt Erstfinanzierung', data: [initialPaid, initialPaid], backgroundColor: '#94a3b8' },
                 { label: 'Akkumulierte Sparrate', data: [sparraten, sparraten], backgroundColor: '#64748b' },
                 { label: 'BS-Darlehen / Eigenkapital', data: [bsDarlehen, 0], backgroundColor: '#f59e0b' },
-                { label: 'Zinskosten Zwischenfinanzierung', data: [zwischenZinsen, 0], backgroundColor: '#a855f7' },
+                { label: 'Zwischenfinanzierung (Raten)', data: [zwischenAufwand, 0], backgroundColor: '#a855f7' },
                 { label: 'Finanzierungslücke Bank (Tilgung)', data: [bsGap, eigenGap], backgroundColor: '#3b82f6' },
                 { label: 'Zinskosten Anschlussphase', data: [bsZinsen, eigenZinsen], backgroundColor: '#ef4444' }
             ]
@@ -1240,8 +1240,8 @@ function calculate() {
     document.getElementById('tableContainerStep3BSGap').innerHTML = renderScheduleTable(bsSim.gapSchedule);
     document.getElementById('tableContainerStep3EigenGap').innerHTML = renderScheduleTable(eigenGapDetails.schedule);
 
-    const zwischenZinsenBar = model.zwischen ? model.zwischen.zinsenTotal : 0;
-    updateBarChart(model.initialPaidInPeriod, totalSparEinzahlungenBS, bsDarlehen, bsSim.bsZinsenTotal + bsSim.gapZinsenTotal, zwischenZinsenBar, bsGapLoan, eigenBankLoan, eigenGapDetails.zinsen);
+    const zwischenAufwandBar = model.zwischen ? model.zwischen.paidTotal : 0;
+    updateBarChart(model.initialPaidInPeriod, totalSparEinzahlungenBS, bsDarlehen, bsSim.bsZinsenTotal + bsSim.gapZinsenTotal, zwischenAufwandBar, bsGapLoan, eigenBankLoan, eigenGapDetails.zinsen);
     updateLineChart(curveLabels, curveData);
 }
 
