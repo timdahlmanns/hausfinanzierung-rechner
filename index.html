@@ -95,8 +95,8 @@
       <div><label class="text-xs font-medium text-slate-600">Erwarteter Bankzins bei Anschluss (%)</label><input type="number" id="bankBauzins" value="3.5" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
       <div><label class="text-xs font-medium text-slate-600">Mindest-Tilgung BS-Banklücke (%)</label><input type="number" id="bankTilgung" value="2.0" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
       <div class="grid grid-cols-2 gap-2">
-        <div><label class="text-xs font-medium text-slate-600">Sondertilgung (% p.a.)</label><input type="number" id="sondertilgungPct" value="5" step="1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
-        <div><label class="text-xs font-medium text-slate-600">Zwischenzins (%)</label><input type="number" id="zwischenZins" value="3.5" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
+        <div><label class="text-xs font-medium text-slate-600 min-h-[2.25rem] flex items-end">Sondertilgung (% p.a.)</label><input type="number" id="sondertilgungPct" value="5" step="1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
+        <div><label class="text-xs font-medium text-slate-600 min-h-[2.25rem] flex items-end">Zwischenzins (%)</label><input type="number" id="zwischenZins" value="3.5" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
       </div>
       <div><label class="text-xs font-medium text-slate-600">Anlagezins geparktes Guthaben (%)</label><input type="number" id="parkZins" value="2.0" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
       <!-- NEU -->
@@ -622,6 +622,19 @@ function computeTargetMonthlyRateFit(monthlyTotals, targetRate) {
     if (!(Number.isFinite(targetRate) && targetRate > 0) || monthlyTotals.length === 0) {
         return { score: Number.POSITIVE_INFINITY, meanAbsDev: Number.POSITIVE_INFINITY, maxDev: Number.POSITIVE_INFINITY, peakPayment: Number.POSITIVE_INFINITY };
     }
+
+    function splitTerminalMonth(monthlyTotals) {
+        if (!Array.isArray(monthlyTotals) || monthlyTotals.length === 0) {
+            return { core: [], terminal: null };
+        }
+        if (monthlyTotals.length === 1) {
+            return { core: monthlyTotals.slice(), terminal: monthlyTotals[0] };
+        }
+        return {
+            core: monthlyTotals.slice(0, -1),
+            terminal: monthlyTotals[monthlyTotals.length - 1]
+        };
+    }
     let absDevSum = 0;
     let maxDev = 0;
     let peakPayment = 0;
@@ -680,7 +693,8 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
         if (!model || !Number.isFinite(model.totalOutlayBS) || model.totalOutlayBS <= 0 || model.totalOutlayBS > MAX_REASONABLE_OUTLAY) return false;
         if (!Array.isArray(monthlyTotals) || monthlyTotals.length === 0) return false;
         if (monthlyTotals.some(v => !Number.isFinite(v) || v < 0 || v > 1e8)) return false;
-        if (monthlyTotals.some(v => v < minAllowedRate || v > maxAllowedRate)) return false;
+        const coreMonths = splitTerminalMonth(monthlyTotals).core;
+        if (coreMonths.length > 0 && coreMonths.some(v => v < minAllowedRate || v > maxAllowedRate)) return false;
         if (model.bsSim && (model.bsSim.fehler || model.bsSim.bsRestschuld > 1 || model.bsSim.gapRestschuld > 1)) return false;
         if (model.eigenGapDetails && model.eigenGapDetails.restschuld > 1) return false;
         return true;
