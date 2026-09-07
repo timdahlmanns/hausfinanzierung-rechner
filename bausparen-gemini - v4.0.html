@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gesamtkosten-Rechner Hausfinanzierung &amp; Bausparvergleich</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans p-4 md:p-8">
+<div class="max-w-7xl mx-auto space-y-6">
+
+  <header class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">Gesamtkosten-Rechner Hausfinanzierung</h1>
+      <p class="text-sm text-slate-500">Vergleich zwischen Finanzierung mit und ohne Bausparvertrag unter der Annahme von optimalem Zuteilungszeitpunkt exakt nach Ende der Zinsbindung.</p>
+    </div>
+    <span class="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-semibold shrink-0">V4.0 Fixes &amp; Laufzeit/Barwert</span>
+  </header>
+
+  <!-- Warnbanner -->
+  <div id="warnBanner" class="hidden bg-red-50 border border-red-200 text-red-800 rounded-2xl p-4 text-sm">
+    <p class="font-bold mb-1">⚠️ Hinweise zur Berechnung</p>
+    <ul id="warnList" class="list-disc list-inside space-y-1 text-xs"></ul>
+  </div>
+
+  <!-- KPI Karten -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Berechnete Restschuld</p>
+      <p id="kpiRestschuld" class="text-2xl font-bold text-slate-900 mt-1">0 €</p>
+      <p id="kpiRestschuldSub" class="text-xs text-slate-400 mt-1">Offen nach Erstfinanzierung</p>
+    </div>
+    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Gesamtrate Ansparphase</p>
+      <p id="kpiAnsparRateGesamt" class="text-2xl font-bold text-blue-600 mt-1">0 € / Mon.</p>
+      <p class="text-xs text-slate-400 mt-1">Erstkredit + Sparrate</p>
+    </div>
+    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Gesamtkosten-Vorteil (nominal)</p>
+      <p id="kpiVorteil" class="text-2xl font-bold mt-1">0 €</p>
+      <p id="kpiVorteilLabel" class="text-xs text-slate-400 mt-1">Vorteil der Eigenanlage</p>
+    </div>
+    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Break-Even Bauzins</p>
+      <p id="kpiBreakEven" class="text-2xl font-bold text-blue-600 mt-1">0,00 %</p>
+      <p class="text-xs text-slate-400 mt-1">Kritischer Bank-Sollzins bei Anschluss</p>
+    </div>
+    <!-- NEU: Laufzeit -->
+    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Gesamtlaufzeit-Differenz</p>
+      <p id="kpiLaufzeitDiff" class="text-2xl font-bold text-purple-600 mt-1">0 Mon.</p>
+      <p id="kpiLaufzeitSub" class="text-xs text-slate-400 mt-1">BS: 0 J. &nbsp;|&nbsp; Eigen: 0 J.</p>
+    </div>
+    <!-- NEU: NPV -->
+    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Barwert-Vorteil (NPV)</p>
+      <p id="kpiNpv" class="text-2xl font-bold mt-1">0 €</p>
+      <p id="kpiNpvLabel" class="text-xs text-slate-400 mt-1">Laufzeitbereinigter Vergleich</p>
+    </div>
+  </div>
+
+  <!-- Eingaben -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+      <h2 class="text-base font-semibold text-slate-900 border-b pb-2 flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-blue-500"></span>1. Erstfinanzierung</h2>
+      <div><label class="text-xs font-medium text-slate-600">Kreditsumme (€)</label><input type="number" id="initSumme" value="440000" step="5000" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
+      <div><label class="text-xs font-medium text-slate-600">Sollzins p.a. (%)</label><input type="number" id="initZins" value="3.80" step="0.05" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
+      <div><label class="text-xs font-medium text-slate-600">Anfängliche Tilgung (%)</label><input type="number" id="initTilgung" value="2.00" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
+      <div><label class="text-xs font-medium text-slate-600">Zinsbindung / Jahre bis Zuteilung</label><input type="number" id="ansparJahre" value="10" step="1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+      <h2 class="text-base font-semibold text-slate-900 border-b pb-2 flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-amber-500"></span>2. Bausparvertrag</h2>
+      <div><label class="text-xs font-medium text-slate-600">Bausparsumme (€)</label><input type="number" id="bsSumme" value="250000" step="5000" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none"></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-xs font-medium text-slate-600">Abschlussgebühr (%)</label><input type="number" id="bsFeePct" value="1.6" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none"></div>
+        <div><label class="text-xs font-medium text-slate-600">Mindestansparung (%)</label><input type="number" id="bsMinPct" value="45" step="1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-xs font-medium text-slate-600">Guthabenzins (%)</label><input type="number" id="bsGuthabenZins" value="0.20" step="0.05" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none"></div>
+        <div><label class="text-xs font-medium text-slate-600">BS-Sollzins (%)</label><input type="number" id="bsSollzins" value="1.40" step="0.05" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none"></div>
+      </div>
+      <div><label class="text-xs font-medium text-slate-600">Monatsrate BS-Darlehen (€)</label><input type="number" id="bsRateDarlehen" value="1975" step="25" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none"></div>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+      <h2 class="text-base font-semibold text-slate-900 border-b pb-2 flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500"></span>3. Markt &amp; Eigenanlage</h2>
+      <div><label class="text-xs font-medium text-slate-600">Netto-Rendite Eigenanlage p.a. (%)</label><input type="number" id="eigenRendite" value="3.0" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
+      <div><label class="text-xs font-medium text-slate-600">Erwarteter Bankzins bei Anschluss (%)</label><input type="number" id="bankBauzins" value="3.5" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
+      <div><label class="text-xs font-medium text-slate-600">Mindest-Tilgung BS-Banklücke (%)</label><input type="number" id="bankTilgung" value="2.0" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
+      <!-- NEU -->
+      <div><label class="text-xs font-medium text-slate-600">Diskontzins Barwert p.a. (%)</label><input type="number" id="diskontZins" value="3.0" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"><p class="text-[10px] text-slate-400 mt-1">Für laufzeitbereinigten NPV-Vergleich</p></div>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+      <div>
+        <h2 class="text-base font-semibold text-slate-900 border-b pb-2 mb-3">Gesamtkosten Haus &amp; Raten</h2>
+        <table class="w-full text-xs text-left text-slate-600">
+          <thead><tr class="border-b font-semibold text-slate-700"><th class="py-1">Baustein</th><th class="py-1 text-right text-amber-600">Mit BS</th><th class="py-1 text-right text-emerald-600">Ohne BS</th></tr></thead>
+          <tbody>
+            <tr class="border-b bg-blue-50/40"><td class="py-1.5 font-bold text-slate-800">Gesamtrate Ansparphase</td><td id="tblAnsparRateBS" class="py-1.5 text-right font-bold text-blue-700">0 €</td><td id="tblAnsparRateEigen" class="py-1.5 text-right font-bold text-blue-700">0 €</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-medium">Sparguthaben Akkumuliert</td><td id="tblGuthabenBS" class="py-1.5 text-right font-semibold text-amber-600">0 €</td><td id="tblGuthabenEigen" class="py-1.5 text-right font-semibold text-emerald-600">0 €</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-medium">BS-Darlehen (Rate / Dauer)</td><td id="tblBSInfo" class="py-1.5 text-right font-medium text-amber-600">0 € (0 J.)</td><td class="py-1.5 text-right text-slate-400">–</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-medium">Bank-Anschlusskredit (Lücke)</td><td id="tblGapBS" class="py-1.5 text-right">0 €</td><td id="tblGapEigen" class="py-1.5 text-right">0 €</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-medium align-top">Bank-Kredit Raten &amp; Dauer</td><td id="tblBankInfoBS" class="py-1.5 text-right font-medium leading-tight">0 €</td><td id="tblBankInfoEigen" class="py-1.5 text-right font-semibold text-emerald-600 align-top">0 € (0 J.)</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-medium">Zinsen Anschlussphase</td><td id="tblZinsenAnschlussBS" class="py-1.5 text-right text-red-500">0 €</td><td id="tblZinsenAnschlussEigen" class="py-1.5 text-right text-red-500">0 €</td></tr>
+            <!-- NEU -->
+            <tr class="border-b bg-purple-50/40"><td class="py-1.5 font-medium">Gesamtlaufzeit</td><td id="tblLaufzeitBS" class="py-1.5 text-right font-semibold text-purple-700">0 J.</td><td id="tblLaufzeitEigen" class="py-1.5 text-right font-semibold text-purple-700">0 J.</td></tr>
+            <tr class="border-b"><td class="py-2 font-bold text-slate-900">Gesamtkosten (nominal)</td><td id="tblTotalBS" class="py-2 text-right font-bold text-slate-900">0 €</td><td id="tblTotalEigen" class="py-2 text-right font-bold text-slate-900">0 €</td></tr>
+            <!-- NEU -->
+            <tr class="bg-purple-50/40"><td class="py-2 font-bold text-purple-900">Barwert aller Zahlungen</td><td id="tblNpvBS" class="py-2 text-right font-bold text-purple-800">0 €</td><td id="tblNpvEigen" class="py-2 text-right font-bold text-purple-800">0 €</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+      <h2 class="text-lg font-semibold text-slate-900 mb-1">Zins- und Aufwandskosten im Vergleich</h2>
+      <p class="text-xs text-slate-500 mb-4">Zusammensetzung der Gesamtausgaben über die gesamte Finanzierung</p>
+      <div class="h-64"><canvas id="barChart"></canvas></div>
+    </div>
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+      <h2 class="text-lg font-semibold text-slate-900 mb-1">Break-Even-Kurve im Vollkostenmodell</h2>
+      <p class="text-xs text-slate-500 mb-4">Kritischer Bankzins bei Anschluss in Abhängigkeit von der Anlage-Rendite (Lücken = kein Break-Even im Bereich 0–40 %)</p>
+      <div class="h-64"><canvas id="lineChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="space-y-4">
+    <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2"><span>🧮 Finanzierungslogik Schritt-für-Schritt</span></h2>
+
+    <!-- Schritt 1 -->
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-blue-500"></span>Schritt 1: Erstfinanzierung &amp; Restschuldberechnung</h3>
+        <span class="text-xs text-slate-400 font-medium">Ansparphase</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div class="space-y-1.5 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+          <p class="font-bold text-slate-800 mb-1">Erstkredit Eckdaten</p>
+          <div class="flex justify-between"><span class="text-slate-500">Kreditsumme:</span><span id="vStep1Summe" class="font-semibold text-slate-800">0 €</span></div>
+          <div class="flex justify-between"><span class="text-slate-500">Sollzins / Tilgung:</span><span id="vStep1ZinsTilg" class="font-semibold text-slate-800">0% / 0%</span></div>
+          <div class="flex justify-between"><span class="text-slate-500">Monatliche Kreditrate:</span><span id="vStep1Rate" class="font-bold text-blue-600">0 € / Mon.</span></div>
+        </div>
+        <div class="space-y-1.5 bg-blue-50/50 p-3.5 rounded-xl border border-blue-100">
+          <p class="font-bold text-blue-900 mb-1">Ergebnis nach Ansparphase (<span id="vStep1Jahre">10</span> Jahre)</p>
+          <div class="flex justify-between"><span class="text-slate-600">Verbleibende Restschuld:</span><span id="vStep1Restschuld" class="font-bold text-blue-700">0 €</span></div>
+          <div class="flex justify-between"><span class="text-slate-600">Gezahlte Zinsen (Erstkredit):</span><span id="vStep1Zinsen" class="font-semibold text-red-500">0 €</span></div>
+          <div class="flex justify-between border-t border-blue-200 pt-1 mt-1"><span class="font-bold text-slate-800">Gesamtrate Ansparphase:</span><span id="vStep1RateGesamtAnspar" class="font-bold text-blue-800">0 € / Mon.</span></div>
+        </div>
+      </div>
+      <details class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
+        <summary class="cursor-pointer font-semibold text-blue-600 hover:text-blue-700 select-none flex items-center justify-between"><span>📐 Ausführliche Formelrechnung &amp; Tilgungsplan anzeigen</span><span class="text-slate-400 text-[10px]">Klicken zum Aufklappen</span></summary>
+        <div class="mt-3 space-y-3 pt-2 border-t border-slate-200 text-slate-700">
+          <p><strong>1. Monatliche Kreditrate der Erstfinanzierung:</strong></p>
+          <div class="p-2.5 bg-white rounded-lg border border-slate-200 font-mono text-[11px]">Rate = Kreditsumme × (Sollzins + Tilgung) / 12<br>Rate = <span id="calcFormulaInitSum">0</span> € × (<span id="calcFormulaInitZins">0</span>% + <span id="calcFormulaInitTilg">0</span>%) / 12 = <strong id="calcFormulaInitRate" class="text-blue-600">0 € / Monat</strong></div>
+          <p><strong>2. Formel für die gezahlten Zinsen der Erstfinanzierung:</strong></p>
+          <div class="p-2.5 bg-white rounded-lg border border-slate-200 font-mono text-[11px] space-y-1">
+            <div>Z<sub>Erstkredit</sub> = ∑ (Restschuld<sub>m-1</sub> × Sollzins / 12) = (N × Rate) - (Kreditsumme - Restschuld<sub>N</sub>)</div>
+            <div>Z<sub>Erstkredit</sub> = (<span id="calcFormulaInitMonate">0</span> Mon. × <span id="calcFormulaInitRateDup">0 €</span>) - (<span id="calcFormulaInitSum2">0</span> € - <span id="calcFormulaRestschuldEndeDup">0</span> €) = <strong id="calcFormulaInitZinsenGesamt" class="text-red-500">0 €</strong></div>
+          </div>
+          <div class="pt-2"><p class="font-bold text-slate-900 mb-1">3. Monatlicher Tilgungsplan Erstkredit (<span id="calcFormulaInitJahre">0</span> Jahre):</p><div id="tableContainerStep1"></div></div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Schritt 2 -->
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-amber-500"></span>Schritt 2: Ansparphase (Bausparer vs. Eigenanlage)</h3>
+        <span class="text-xs text-slate-400 font-medium">Kapitalaufbau</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div class="space-y-1.5 bg-amber-50/50 p-3.5 rounded-xl border border-amber-100">
+          <p class="font-bold text-amber-900 mb-1">Option A: Bausparvertrag</p>
+          <div class="flex justify-between"><span class="text-slate-600">Erforderliche BS-Sparrate (R):</span><span id="vStep2BsRate" class="font-bold text-amber-600">0 € / Mon.</span></div>
+          <div class="flex justify-between"><span class="text-slate-600">Netto-Ansparguthaben:</span><span id="vStep2BsGuthaben" class="font-semibold text-slate-800">0 €</span></div>
+          <div class="flex justify-between border-t border-amber-200 pt-1 mt-1"><span class="font-medium text-amber-900">Monatliche Gesamtrate:</span><span id="vStep2BsRateGesamt" class="font-bold text-amber-800">0 € / Mon.</span></div>
+        </div>
+        <div class="space-y-1.5 bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-100">
+          <p class="font-bold text-emerald-900 mb-1">Option B: Eigenanlage</p>
+          <div class="flex justify-between"><span class="text-slate-600">Gleiche Sparrate (R):</span><span id="vStep2EigenRate" class="font-bold text-emerald-600">0 € / Mon.</span></div>
+          <div class="flex justify-between"><span class="text-slate-600">Endwert Guthaben (inkl. Rendite):</span><span id="vStep2EigenGuthaben" class="font-semibold text-slate-800">0 €</span></div>
+          <div class="flex justify-between border-t border-emerald-200 pt-1 mt-1"><span class="font-medium text-emerald-900">Monatliche Gesamtrate:</span><span id="vStep2EigenRateGesamt" class="font-bold text-emerald-800">0 € / Mon.</span></div>
+        </div>
+      </div>
+      <details class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
+        <summary class="cursor-pointer font-semibold text-amber-600 hover:text-amber-700 select-none flex items-center justify-between"><span>📐 Ausführliche Formelrechnung &amp; Zwischenschritte anzeigen</span><span class="text-slate-400 text-[10px]">Klicken zum Aufklappen</span></summary>
+        <div class="mt-3 space-y-2 pt-2 border-t border-slate-200 text-slate-700">
+          <p><strong>1. Notwendige monatliche Bauspar-Sparrate (R):</strong></p>
+          <div class="p-2.5 bg-white rounded-lg border border-slate-200 font-mono text-[11px]">Zielguthaben = BS-Summe × Mindestansparung = <span id="calcFormulaBsSumme">0</span> € × <span id="calcFormulaBsMinPct">0</span>% = <span id="calcFormulaBsZielGuthaben">0 €</span><br>Abschlussgebühr = <span id="calcFormulaBsSumme2">0</span> € × <span id="calcFormulaBsFeePct">0</span>% = <span id="calcFormulaBsFee">0 €</span><br>Erforderliche Sparrate R = <strong id="calcFormulaBsSparrate" class="text-amber-600">0 € / Monat</strong></div>
+          <p><strong>2. Formel für das Endguthaben der Eigenanlage (Rentenendwert):</strong></p>
+          <div class="p-2.5 bg-white rounded-lg border border-slate-200 font-mono text-[11px] space-y-1">
+            <div>FV<sub>Eigenanlage</sub> = R × [ (1 + r<sub>m</sub>)<sup>N</sup> - 1 ] / r<sub>m</sub>&nbsp;&nbsp;(mit r<sub>m</sub> = Rendite p.a. / 12)</div>
+            <div>FV<sub>Eigenanlage</sub> = <span id="calcFormulaEigenRVal">0 €</span> × [ (1 + <span id="calcFormulaEigenRenditePct">0</span>% / 12)<sup><span id="calcFormulaEigenMonate">0</span></sup> - 1 ] / (<span id="calcFormulaEigenRenditePct2">0</span>% / 12) = <strong id="calcFormulaEigenFinalGuthaben" class="text-emerald-600">0 €</strong></div>
+          </div>
+          <p><strong>3. Gegenüberstellung der Guthaben bei Zuteilung:</strong></p>
+          <ul class="list-disc list-inside space-y-1 text-slate-600 pl-1">
+            <li>Eingezahlte Sparraten gesamt (R × N): <span id="calcFormulaTotalAnspar">0 €</span></li>
+            <li>Bausparguthaben (netto nach Gebühr &amp; Guthabenzins): <strong id="calcFormulaBsFinalGuthaben" class="text-amber-600">0 €</strong></li>
+            <li>Generierter Zinsgewinn Eigenanlage: <strong id="calcFormulaEigenZinsgewinn" class="text-emerald-600">0 €</strong></li>
+          </ul>
+        </div>
+      </details>
+    </div>
+
+    <!-- Schritt 3 -->
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500"></span>Schritt 3: Anschlusstilgung &amp; 2-Phasen-Ratenrechnung</h3>
+        <span class="text-xs text-slate-400 font-medium">Tilgungsphase</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div class="space-y-1.5 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+          <p class="font-bold text-slate-900 mb-1">Strategie MIT Bausparer (2 Phasen)</p>
+          <div class="flex justify-between"><span class="text-slate-600">Phase 1 Rate (BS + Banklücke):</span><span id="vStep3BsRateP1" class="font-semibold text-slate-800">0 € / Mon.</span></div>
+          <div class="flex justify-between"><span class="text-slate-600">Phase 2 Rate (Nach BS-Tilgung):</span><span id="vStep3BsRateP2" class="font-bold text-blue-600">0 € / Mon.</span></div>
+          <div class="flex justify-between"><span class="text-slate-600">Gesamtdauer Anschlusstilgung:</span><span id="vStep3BsDauer" class="font-semibold text-slate-800">0 J. 0 M.</span></div>
+        </div>
+        <div class="space-y-1.5 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+          <p class="font-bold text-slate-900 mb-1">Strategie OHNE Bausparer (Eigenanlage)</p>
+          <div class="flex justify-between"><span class="text-slate-600">Monatliche Bankrate (Budget-Parität):</span><span id="vStep3EigenRate" class="font-bold text-emerald-600">0 € / Mon.</span></div>
+          <div class="flex justify-between"><span class="text-slate-600">Bank-Anschlusskredit Netto:</span><span id="vStep3EigenGap" class="font-semibold text-slate-800">0 €</span></div>
+          <div class="flex justify-between"><span class="text-slate-600">Gesamtdauer Anschlusstilgung:</span><span id="vStep3EigenDauer" class="font-semibold text-slate-800">0 J. 0 M.</span></div>
+        </div>
+      </div>
+      <details class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
+        <summary class="cursor-pointer font-semibold text-emerald-600 hover:text-emerald-700 select-none flex items-center justify-between"><span>📐 Ausführliche Formelrechnung &amp; Tilgungspläne der Anschlüsse anzeigen</span><span class="text-slate-400 text-[10px]">Klicken zum Aufklappen</span></summary>
+        <div class="mt-3 space-y-4 pt-2 border-t border-slate-200 text-slate-700">
+          <div>
+            <p><strong>1. Formeln für gezahlte Zinsen der Bauspar-Strategie:</strong></p>
+            <div class="p-2.5 bg-white rounded-lg border border-slate-200 font-mono text-[11px] space-y-2 mt-1">
+              <div><strong class="text-amber-700">a) Zinsen Bauspardarlehen:</strong><br>Z<sub>BS</sub> = ∑ (BS-Restschuld<sub>m-1</sub> × i<sub>BS</sub> / 12) = (M<sub>BS</sub> × Rate<sub>BS</sub>) - BS-Darlehen<br>Z<sub>BS</sub> = (<span id="calcFormulaBsMonateCount">0</span> Mon. × <span id="calcFormulaBsDarlehenPmtVal">0 €</span>) - <span id="calcFormulaBsDarlehenVal">0 €</span> = <strong id="calcFormulaBsDarlehenZinsenVal" class="text-amber-600">0 €</strong></div>
+              <div class="border-t border-slate-200 pt-1.5"><strong class="text-blue-700">b) Zinsen Banklücke (2-Phasen):</strong><br>Z<sub>Banklücke</sub> = (Raten Phase 1 + Raten Phase 2) - Banklücke<br>Z<sub>Banklücke</sub> = <span id="calcFormulaBsGapSumRaten">0 €</span> - <span id="calcFormulaBsGapSumVal">0 €</span> = <strong id="calcFormulaBsGapZinsen" class="text-red-500">0 €</strong></div>
+            </div>
+          </div>
+          <div class="space-y-3 pt-1">
+            <div><p class="font-bold text-amber-900 mb-1">a) Tilgungsplan Bauspardarlehen:</p><div id="tableContainerStep3BSLoan"></div></div>
+            <div><p class="font-bold text-blue-900 mb-1">b) Tilgungsplan Bank-Anschlusslücke (2-Phasen):</p><div id="tableContainerStep3BSGap"></div></div>
+          </div>
+          <div class="border-t border-slate-200 pt-3">
+            <p><strong>2. Formel für gezahlte Zinsen der Eigenanlage-Strategie:</strong></p>
+            <div class="p-2.5 bg-white rounded-lg border border-slate-200 font-mono text-[11px] space-y-1 mt-1">
+              <div>Z<sub>Bank, Eigen</sub> = (M<sub>Eigen</sub> × Rate<sub>Eigen</sub>) - Bankkredit</div>
+              <div>Z<sub>Bank, Eigen</sub> = (<span id="calcFormulaEigenMonateCount">0</span> Mon. × <span id="calcFormulaEigenPmtVal">0 €</span>) - <span id="calcFormulaEigenGapVal">0 €</span> = <strong id="calcFormulaEigenZinsen" class="text-emerald-600">0 €</strong></div>
+            </div>
+            <div class="mt-2"><p class="font-bold text-emerald-900 mb-1">c) Tilgungsplan Anschlusskredit Eigenanlage-Pfad:</p><div id="tableContainerStep3EigenGap"></div></div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Schritt 4 -->
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-purple-500"></span>Schritt 4: Gesamtkosten-Synthese &amp; Break-Even</h3>
+        <span class="text-xs text-slate-400 font-medium">Auswertung</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div class="bg-amber-50/60 p-3.5 rounded-xl border border-amber-200 space-y-1"><p class="font-bold text-amber-900">Gesamtkosten Mit Bausparer</p><p id="vStep4TotBs" class="text-xl font-bold text-slate-900">0 €</p><p class="text-[11px] text-amber-700">Inkl. Erstfinanzierung, Bausparer &amp; Banklücke</p></div>
+        <div class="bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-200 space-y-1"><p class="font-bold text-emerald-900">Gesamtkosten Mit Eigenanlage</p><p id="vStep4TotEigen" class="text-xl font-bold text-slate-900">0 €</p><p class="text-[11px] text-emerald-700">Inkl. Erstfinanzierung, Eigenkapital &amp; Bankkredit</p></div>
+      </div>
+      <details class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
+        <summary class="cursor-pointer font-semibold text-purple-600 hover:text-purple-700 select-none flex items-center justify-between"><span>📐 Ausführliche Formelrechnung &amp; Zwischenschritte anzeigen</span><span class="text-slate-400 text-[10px]">Klicken zum Aufklappen</span></summary>
+        <div class="mt-3 space-y-3 pt-2 border-t border-slate-200 text-slate-700">
+          <p><strong>Summe aller Aufwendungen im Vergleich:</strong></p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="p-3 bg-amber-50/50 rounded-lg border border-amber-200"><p class="font-bold text-amber-900">Gesamtkosten Mit Bausparer</p><ul class="mt-1 space-y-0.5 text-[11px] text-amber-800"><li>Erstfinanzierung Raten: <span id="calcFormulaTotBsInit">0 €</span></li><li>+ Bauspar Sparraten: <span id="calcFormulaTotBsSpar">0 €</span></li><li>+ BS-Darlehen + Zinsen: <span id="calcFormulaTotBsDarlehen">0 €</span></li><li>+ Banklücke + Zinsen: <span id="calcFormulaTotBsGap">0 €</span></li><li class="font-bold border-t border-amber-300 pt-1 mt-1 text-slate-900">= Summe: <span id="calcFormulaTotBsSum">0 €</span></li></ul></div>
+            <div class="p-3 bg-emerald-50/50 rounded-lg border border-emerald-200"><p class="font-bold text-emerald-900">Gesamtkosten Eigenanlage</p><ul class="mt-1 space-y-0.5 text-[11px] text-emerald-800"><li>Erstfinanzierung Raten: <span id="calcFormulaTotEigenInit">0 €</span></li><li>+ Eigenanlage Sparraten: <span id="calcFormulaTotEigenSpar">0 €</span></li><li>+ Bankkredit + Zinsen: <span id="calcFormulaTotEigenGap">0 €</span></li><li class="font-bold border-t border-emerald-300 pt-1 mt-1 text-slate-900">= Summe: <span id="calcFormulaTotEigenSum">0 €</span></li></ul></div>
+          </div>
+          <p class="pt-1"><strong>Kritischer Break-Even Bankzins:</strong> Bei einem Anschluss-Sollzins der Bank von <strong id="calcFormulaBreakEven" class="text-blue-600">0,00 % p.a.</strong> liefern beide Finanzierungswege exakt dieselben Gesamtkosten.</p>
+        </div>
+      </details>
+    </div>
+
+    <!-- Schritt 5 NEU -->
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-purple-600"></span>Schritt 5: Laufzeitbereinigter Vergleich (Barwert / NPV)</h3>
+        <span class="text-xs text-slate-400 font-medium">Zeitwert des Geldes</span>
+      </div>
+      <p class="text-xs text-slate-500">Die nominale Summe ignoriert, dass Zahlungen zu unterschiedlichen Zeitpunkten und über unterschiedlich lange Zeiträume anfallen. Der Barwert diskontiert jede Monatsrate auf den Startzeitpunkt und macht die Pfade dadurch trotz unterschiedlicher Laufzeit vergleichbar.</p>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <div class="bg-amber-50/60 p-3.5 rounded-xl border border-amber-200 space-y-1"><p class="font-bold text-amber-900">Barwert Bauspar-Pfad</p><p id="vStep5NpvBs" class="text-xl font-bold text-slate-900">0 €</p><p id="vStep5DauerBs" class="text-[11px] text-amber-700">Laufzeit: 0 J.</p></div>
+        <div class="bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-200 space-y-1"><p class="font-bold text-emerald-900">Barwert Eigenanlage-Pfad</p><p id="vStep5NpvEigen" class="text-xl font-bold text-slate-900">0 €</p><p id="vStep5DauerEigen" class="text-[11px] text-emerald-700">Laufzeit: 0 J.</p></div>
+        <div class="bg-purple-50/60 p-3.5 rounded-xl border border-purple-200 space-y-1"><p class="font-bold text-purple-900">Barwert-Differenz</p><p id="vStep5NpvDiff" class="text-xl font-bold text-slate-900">0 €</p><p id="vStep5NpvDiffLabel" class="text-[11px] text-purple-700">–</p></div>
+      </div>
+      <details class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
+        <summary class="cursor-pointer font-semibold text-purple-600 hover:text-purple-700 select-none flex items-center justify-between"><span>📐 Barwertformel &amp; Laufzeitvergleich anzeigen</span><span class="text-slate-400 text-[10px]">Klicken zum Aufklappen</span></summary>
+        <div class="mt-3 space-y-3 pt-2 border-t border-slate-200 text-slate-700">
+          <div class="p-2.5 bg-white rounded-lg border border-slate-200 font-mono text-[11px] space-y-1">
+            <div>NPV = ∑<sub>m=1..M</sub> CF<sub>m</sub> / (1 + d<sub>m</sub>)<sup>m</sup>&nbsp;&nbsp;(mit d<sub>m</sub> = Diskontzins p.a. / 12)</div>
+            <div>Diskontzins d = <span id="calcFormulaDiskont">0</span> % p.a. → d<sub>m</sub> = <span id="calcFormulaDiskontM">0</span> % / Monat</div>
+          </div>
+          <ul class="list-disc list-inside space-y-1 text-slate-600 pl-1">
+            <li>Laufzeit Bauspar-Pfad: <strong id="calcFormulaDauerBs" class="text-amber-600">0</strong> (Ansparphase + Anschlusstilgung)</li>
+            <li>Laufzeit Eigenanlage-Pfad: <strong id="calcFormulaDauerEigen" class="text-emerald-600">0</strong></li>
+            <li>Laufzeit-Differenz: <strong id="calcFormulaDauerDiff" class="text-purple-600">0 Mon.</strong></li>
+            <li>Nominale Mehrkosten des längeren Pfades sind teilweise nur ein Laufzeiteffekt – die Barwert-Differenz von <strong id="calcFormulaNpvDiffDup" class="text-purple-600">0 €</strong> bereinigt diesen.</li>
+          </ul>
+        </div>
+      </details>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let barChart = null;
+let lineChart = null;
+
+function calculate() {
+    const warnungen = [];
+
+    // ---------- Inputs ----------
+    const initSumme      = parseFloat(document.getElementById('initSumme').value) || 0;
+    const initZins       = (parseFloat(document.getElementById('initZins').value) || 0) / 100;
+    const initTilgung    = (parseFloat(document.getElementById('initTilgung').value) || 0) / 100;
+    const ansparJahre    = parseFloat(document.getElementById('ansparJahre').value) || 1;
+
+    const bsSumme        = parseFloat(document.getElementById('bsSumme').value) || 0;
+    const bsFeePct       = (parseFloat(document.getElementById('bsFeePct').value) || 0) / 100;
+    const bsMinPct       = (parseFloat(document.getElementById('bsMinPct').value) || 0) / 100;
+    const bsGuthabenZins = (parseFloat(document.getElementById('bsGuthabenZins').value) || 0) / 100;
+    const bsSollzins     = (parseFloat(document.getElementById('bsSollzins').value) || 0) / 100;
+    const bsRateDarlehen = parseFloat(document.getElementById('bsRateDarlehen').value) || 0;
+
+    const eigenRendite   = (parseFloat(document.getElementById('eigenRendite').value) || 0) / 100;
+    const bankBauzins    = (parseFloat(document.getElementById('bankBauzins').value) || 0) / 100;
+    const bankTilgung    = (parseFloat(document.getElementById('bankTilgung').value) || 0) / 100;
+    const diskontZins    = (parseFloat(document.getElementById('diskontZins').value) || 0) / 100;
+
+    const ansparMonate = Math.round(ansparJahre * 12);
+
+    // ---------- 1. Erstkredit ----------
+    let initBalance = initSumme;
+    const r_init = initZins / 12;
+    const pmt_init = initSumme * (initZins + initTilgung) / 12;
+    let initZinsenTotal = 0;
+    const step1Schedule = [];
+
+    if (pmt_init <= initSumme * r_init && initSumme > 0) {
+        warnungen.push("Die Rate der Erstfinanzierung deckt den Monatszins nicht – die Restschuld würde wachsen. Bitte Tilgung erhöhen.");
+    }
+
+    for (let m = 1; m <= ansparMonate; m++) {
+        let intr = initBalance * r_init;
+        let prin = pmt_init - intr;
+        initBalance -= prin;
+        initZinsenTotal += intr;
+        step1Schedule.push({ m: m, pmt: pmt_init, intr: intr, prin: prin, bal: Math.max(0, initBalance) });
+    }
+    const calculatedRestschuld = Math.max(0, initBalance);
+    const initialPaidInPeriod = pmt_init * ansparMonate;
+
+    // ---------- 2. Bauspar-Sparrate ----------
+    const fee = bsSumme * bsFeePct;
+    const targetGuthaben = bsSumme * bsMinPct;
+    const r_bs_anspar = bsGuthabenZins / 12;
+    let factor_bs = ansparMonate;
+    if (r_bs_anspar > 0) factor_bs = (Math.pow(1 + r_bs_anspar, ansparMonate) - 1) / r_bs_anspar;
+    const fv_fee = fee * Math.pow(1 + r_bs_anspar, ansparMonate);
+    const R = (targetGuthaben + fv_fee) / factor_bs;
+    const totalSparEinzahlungen = R * ansparMonate;
+    const pmt_anspar_gesamt = pmt_init + R;
+
+    // ---------- 3. Strategie A: Bausparer ----------
+    const bsDarlehen = Math.max(0, bsSumme - targetGuthaben);
+    const bsGapLoan  = Math.max(0, calculatedRestschuld - bsSumme);
+
+    const bsSim = runCombinedBausparAndGapLoan(bsDarlehen, bsSollzins, bsRateDarlehen, bsGapLoan, bankBauzins, bankTilgung);
+
+    if (bsSim.fehler) warnungen.push("Bauspardarlehen: " + bsSim.fehler);
+    if (bsSim.bsRestschuld > 1)  warnungen.push(`Bauspardarlehen wird nicht vollständig getilgt – offene Restschuld: ${formatEUR(bsSim.bsRestschuld)}. Diese ist in den Gesamtkosten enthalten.`);
+    if (bsSim.gapRestschuld > 1) warnungen.push(`Banklücke (BS-Pfad) wird nicht vollständig getilgt – offene Restschuld: ${formatEUR(bsSim.gapRestschuld)}.`);
+
+    const totalZinsenAnschlussBS = bsSim.bsZinsenTotal + bsSim.gapZinsenTotal;
+    const totalOutlayBS = initialPaidInPeriod + totalSparEinzahlungen
+                        + bsDarlehen + bsSim.bsZinsenTotal + bsSim.bsRestschuld
+                        + bsGapLoan  + bsSim.gapZinsenTotal + bsSim.gapRestschuld;
+
+    const initialCombinedRateBS = (bsDarlehen > 0.001 ? bsRateDarlehen : 0) + bsSim.initialGapPmt;
+
+    // ---------- 4. Strategie B: Eigenanlage ----------
+    const r_e = eigenRendite / 12;
+    const fvEigen = (r_e > 0) ? R * ((Math.pow(1 + r_e, ansparMonate) - 1) / r_e) : totalSparEinzahlungen;
+    const eigenBankLoan = Math.max(0, calculatedRestschuld - fvEigen);
+
+    const targetEigenRate = initialCombinedRateBS > 0 ? initialCombinedRateBS : (eigenBankLoan * (bankBauzins + bankTilgung) / 12);
+    const eigenGapDetails = runBankLoanDetailsByPmt(eigenBankLoan, bankBauzins, targetEigenRate);
+
+    if (eigenGapDetails.angehoben) {
+        warnungen.push(`Budget-Parität verletzt: Die Rate des Eigenanlage-Bankkredits musste von ${formatEUR(targetEigenRate)} auf ${formatEUR(eigenGapDetails.pmt)} angehoben werden, damit der Kredit überhaupt tilgt. Der Vergleich ist damit nicht mehr budgetneutral.`);
+    }
+    if (eigenGapDetails.restschuld > 1) {
+        warnungen.push(`Bankkredit (Eigenanlage-Pfad) wird nicht vollständig getilgt – offene Restschuld: ${formatEUR(eigenGapDetails.restschuld)}.`);
+    }
+
+    const totalOutlayEigen = initialPaidInPeriod + totalSparEinzahlungen
+                           + eigenBankLoan + eigenGapDetails.zinsen + eigenGapDetails.restschuld;
+
+    // ---------- 5. Break-Even ----------
+    const breakEvenRate = calculateBreakEvenForVollkosten(
+        eigenRendite, R, ansparMonate, calculatedRestschuld, bsSumme, targetGuthaben,
+        bsSollzins, bsRateDarlehen, totalSparEinzahlungen, initialPaidInPeriod, bankTilgung);
+
+    // ---------- 6. Break-Even-Kurve ----------
+    const curveLabels = [];
+    const curveData = [];
+    for (let y = 0.0; y <= 0.0601; y += 0.005) {
+        curveLabels.push((y * 100).toFixed(1) + " %");
+        const be = calculateBreakEvenForVollkosten(
+            y, R, ansparMonate, calculatedRestschuld, bsSumme, targetGuthaben,
+            bsSollzins, bsRateDarlehen, totalSparEinzahlungen, initialPaidInPeriod, bankTilgung);
+        curveData.push(be === null ? null : be * 100);
+    }
+
+    // ---------- 7. NEU: Laufzeiten & Barwert ----------
+    const anschlussMonateBS    = Math.max(bsSim.bsMonate, bsSim.gapMonate);
+    const gesamtMonateBS       = ansparMonate + anschlussMonateBS;
+    const gesamtMonateEigen    = ansparMonate + eigenGapDetails.monate;
+    const laufzeitDiffMonate   = gesamtMonateBS - gesamtMonateEigen;
+
+    const d_m = diskontZins / 12;
+    const npvBS = computeNPV(ansparMonate, pmt_anspar_gesamt, [bsSim.bsSchedule, bsSim.gapSchedule], d_m);
+    const npvEigen = computeNPV(ansparMonate, pmt_anspar_gesamt, [eigenGapDetails.schedule], d_m);
+    const npvDiff = npvBS - npvEigen;
+
+    // ---------- UI: Warnungen ----------
+    const warnBanner = document.getElementById('warnBanner');
+    const warnList = document.getElementById('warnList');
+    if (warnungen.length > 0) {
+        warnList.innerHTML = warnungen.map(w => `<li>${w}</li>`).join('');
+        warnBanner.classList.remove('hidden');
+    } else {
+        warnBanner.classList.add('hidden');
+        warnList.innerHTML = '';
+    }
+
+    // ---------- UI: KPIs ----------
+    document.getElementById('kpiRestschuld').innerText = formatEUR(calculatedRestschuld);
+    document.getElementById('kpiRestschuldSub').innerText = `Offen nach ${ansparJahre} Jahren Erstfinanzierung`;
+    document.getElementById('kpiAnsparRateGesamt').innerText = formatEUR(pmt_anspar_gesamt) + " / Mon.";
+    document.getElementById('kpiBreakEven').innerText = breakEvenRate === null ? "n/a" : (breakEvenRate * 100).toFixed(2) + " %";
+
+    const diff = totalOutlayBS - totalOutlayEigen;
+    const kpiVorteil = document.getElementById('kpiVorteil');
+    const kpiVorteilLabel = document.getElementById('kpiVorteilLabel');
+    if (diff > 0) {
+        kpiVorteil.innerText = "+" + formatEUR(diff);
+        kpiVorteil.className = "text-2xl font-bold mt-1 text-emerald-600";
+        kpiVorteilLabel.innerText = "Vorteil der Eigenanlage";
+    } else {
+        kpiVorteil.innerText = "+" + formatEUR(Math.abs(diff));
+        kpiVorteil.className = "text-2xl font-bold mt-1 text-amber-600";
+        kpiVorteilLabel.innerText = "Vorteil der Bauspar-Kombi";
+    }
+
+    // NEU: Laufzeit-KPI
+    const kpiLaufzeitDiff = document.getElementById('kpiLaufzeitDiff');
+    kpiLaufzeitDiff.innerText = (laufzeitDiffMonate === 0 ? "" : (laufzeitDiffMonate > 0 ? "+" : "−")) + formatDuration(Math.abs(laufzeitDiffMonate));
+    kpiLaufzeitDiff.className = "text-2xl font-bold mt-1 " + (laufzeitDiffMonate > 0 ? "text-amber-600" : laufzeitDiffMonate < 0 ? "text-emerald-600" : "text-slate-700");
+    document.getElementById('kpiLaufzeitSub').innerText = `BS: ${formatDuration(gesamtMonateBS)} | Eigen: ${formatDuration(gesamtMonateEigen)}`;
+
+    // NEU: NPV-KPI
+    const kpiNpv = document.getElementById('kpiNpv');
+    const kpiNpvLabel = document.getElementById('kpiNpvLabel');
+    if (npvDiff > 0) {
+        kpiNpv.innerText = "+" + formatEUR(npvDiff);
+        kpiNpv.className = "text-2xl font-bold mt-1 text-emerald-600";
+        kpiNpvLabel.innerText = `Barwert-Vorteil Eigenanlage (d = ${(diskontZins*100).toFixed(1)} %)`;
+    } else {
+        kpiNpv.innerText = "+" + formatEUR(Math.abs(npvDiff));
+        kpiNpv.className = "text-2xl font-bold mt-1 text-amber-600";
+        kpiNpvLabel.innerText = `Barwert-Vorteil Bauspar-Kombi (d = ${(diskontZins*100).toFixed(1)} %)`;
+    }
+
+    // ---------- UI: Vergleichstabelle ----------
+    document.getElementById('tblAnsparRateBS').innerText = formatEUR(pmt_anspar_gesamt) + " / M.";
+    document.getElementById('tblAnsparRateEigen').innerText = formatEUR(pmt_anspar_gesamt) + " / M.";
+    document.getElementById('tblGuthabenBS').innerText = formatEUR(targetGuthaben);
+    document.getElementById('tblGuthabenEigen').innerText = formatEUR(fvEigen);
+    document.getElementById('tblBSInfo').innerText = bsDarlehen > 0.001 ? `${formatEUR(bsRateDarlehen)} (${formatDuration(bsSim.bsMonate)})` : "–";
+    document.getElementById('tblGapBS').innerText = formatEUR(bsGapLoan);
+    document.getElementById('tblGapEigen').innerText = formatEUR(eigenBankLoan);
+
+    if (bsGapLoan > 0) {
+        let htmlBSBank = `<div class="space-y-0.5">`;
+        htmlBSBank += `<div class="text-[11px]"><span class="text-slate-400">P1:</span> <strong class="text-slate-700">${formatEUR(bsSim.initialGapPmt)}</strong> (${formatDuration(bsSim.gapPhase1Monate)})</div>`;
+        if (bsSim.gapPhase2Monate > 0) {
+            htmlBSBank += `<div class="text-[11px]"><span class="text-blue-500 font-semibold">P2:</span> <strong class="text-blue-600">${formatEUR(bsSim.phase2GapPmt)}</strong> (${formatDuration(bsSim.gapPhase2Monate)})</div>`;
+        }
+        htmlBSBank += `</div>`;
+        document.getElementById('tblBankInfoBS').innerHTML = htmlBSBank;
+    } else {
+        document.getElementById('tblBankInfoBS').innerText = "0 €";
+    }
+
+    document.getElementById('tblBankInfoEigen').innerText = eigenBankLoan > 0 ? `${formatEUR(eigenGapDetails.pmt)} (${formatDuration(eigenGapDetails.monate)})` : "0 €";
+    document.getElementById('tblZinsenAnschlussBS').innerText = formatEUR(totalZinsenAnschlussBS);
+    document.getElementById('tblZinsenAnschlussEigen').innerText = formatEUR(eigenGapDetails.zinsen);
+    document.getElementById('tblLaufzeitBS').innerText = formatDuration(gesamtMonateBS);
+    document.getElementById('tblLaufzeitEigen').innerText = formatDuration(gesamtMonateEigen);
+    document.getElementById('tblTotalBS').innerText = formatEUR(totalOutlayBS);
+    document.getElementById('tblTotalEigen').innerText = formatEUR(totalOutlayEigen);
+    document.getElementById('tblNpvBS').innerText = formatEUR(npvBS);
+    document.getElementById('tblNpvEigen').innerText = formatEUR(npvEigen);
+
+    // ---------- UI: Schritt 1 ----------
+    document.getElementById('vStep1Summe').innerText = formatEUR(initSumme);
+    document.getElementById('vStep1ZinsTilg').innerText = `${(initZins * 100).toFixed(2)}% / ${(initTilgung * 100).toFixed(2)}%`;
+    document.getElementById('vStep1Rate').innerText = formatEUR(pmt_init) + " / Mon.";
+    document.getElementById('vStep1Jahre').innerText = ansparJahre;
+    document.getElementById('vStep1Restschuld').innerText = formatEUR(calculatedRestschuld);
+    document.getElementById('vStep1Zinsen').innerText = formatEUR(initZinsenTotal);
+    document.getElementById('vStep1RateGesamtAnspar').innerText = formatEUR(pmt_anspar_gesamt) + " / Mon.";
+
+    // ---------- UI: Schritt 2 ----------
+    document.getElementById('vStep2BsRate').innerText = formatEUR(R) + " / Mon.";
+    document.getElementById('vStep2BsGuthaben').innerText = formatEUR(targetGuthaben);
+    document.getElementById('vStep2BsRateGesamt').innerText = formatEUR(pmt_anspar_gesamt) + " / Mon.";
+    document.getElementById('vStep2EigenRate').innerText = formatEUR(R) + " / Mon.";
+    document.getElementById('vStep2EigenGuthaben').innerText = formatEUR(fvEigen);
+    document.getElementById('vStep2EigenRateGesamt').innerText = formatEUR(pmt_anspar_gesamt) + " / Mon.";
+
+    // ---------- UI: Schritt 3 ----------
+    document.getElementById('vStep3BsRateP1').innerText = formatEUR(initialCombinedRateBS) + " / Mon.";
+    document.getElementById('vStep3BsRateP2').innerText = formatEUR(bsSim.phase2GapPmt) + " / Mon.";
+    document.getElementById('vStep3BsDauer').innerText = formatDuration(bsSim.gapMonate);
+    document.getElementById('vStep3EigenRate').innerText = formatEUR(eigenGapDetails.pmt) + " / Mon.";
+    document.getElementById('vStep3EigenGap').innerText = formatEUR(eigenBankLoan);
+    document.getElementById('vStep3EigenDauer').innerText = formatDuration(eigenGapDetails.monate);
+
+    // ---------- UI: Schritt 4 ----------
+    document.getElementById('vStep4TotBs').innerText = formatEUR(totalOutlayBS);
+    document.getElementById('vStep4TotEigen').innerText = formatEUR(totalOutlayEigen);
+
+    // ---------- UI: Schritt 5 (NEU) ----------
+    document.getElementById('vStep5NpvBs').innerText = formatEUR(npvBS);
+    document.getElementById('vStep5NpvEigen').innerText = formatEUR(npvEigen);
+    document.getElementById('vStep5DauerBs').innerText = "Laufzeit: " + formatDuration(gesamtMonateBS);
+    document.getElementById('vStep5DauerEigen').innerText = "Laufzeit: " + formatDuration(gesamtMonateEigen);
+    document.getElementById('vStep5NpvDiff').innerText = (npvDiff >= 0 ? "+" : "−") + formatEUR(Math.abs(npvDiff));
+    document.getElementById('vStep5NpvDiffLabel').innerText = npvDiff >= 0 ? "zugunsten Eigenanlage" : "zugunsten Bauspar-Kombi";
+    document.getElementById('calcFormulaDiskont').innerText = (diskontZins * 100).toFixed(2);
+    document.getElementById('calcFormulaDiskontM').innerText = (d_m * 100).toFixed(4);
+    document.getElementById('calcFormulaDauerBs').innerText = formatDuration(gesamtMonateBS);
+    document.getElementById('calcFormulaDauerEigen').innerText = formatDuration(gesamtMonateEigen);
+    document.getElementById('calcFormulaDauerDiff').innerText = (laufzeitDiffMonate >= 0 ? "+" : "−") + Math.abs(laufzeitDiffMonate) + " Mon.";
+    document.getElementById('calcFormulaNpvDiffDup').innerText = (npvDiff >= 0 ? "+" : "−") + formatEUR(Math.abs(npvDiff));
+
+    // ---------- UI: Formel-Akkordeons ----------
+    document.getElementById('calcFormulaInitSum').innerText = formatEUR(initSumme, false);
+    document.getElementById('calcFormulaInitZins').innerText = (initZins * 100).toFixed(2);
+    document.getElementById('calcFormulaInitTilg').innerText = (initTilgung * 100).toFixed(2);
+    document.getElementById('calcFormulaInitRate').innerText = formatEUR(pmt_init) + " / Mon.";
+    document.getElementById('calcFormulaInitJahre').innerText = ansparJahre;
+    document.getElementById('calcFormulaInitMonate').innerText = ansparMonate;
+    document.getElementById('calcFormulaInitRateDup').innerText = formatEUR(pmt_init) + " / Mon.";
+    document.getElementById('calcFormulaInitSum2').innerText = formatEUR(initSumme, false);
+    document.getElementById('calcFormulaRestschuldEndeDup').innerText = formatEUR(calculatedRestschuld);
+    document.getElementById('calcFormulaInitZinsenGesamt').innerText = formatEUR(initZinsenTotal);
+
+    document.getElementById('calcFormulaBsSumme').innerText = formatEUR(bsSumme, false);
+    document.getElementById('calcFormulaBsSumme2').innerText = formatEUR(bsSumme, false);
+    document.getElementById('calcFormulaBsMinPct').innerText = (bsMinPct * 100).toFixed(0);
+    document.getElementById('calcFormulaBsZielGuthaben').innerText = formatEUR(targetGuthaben);
+    document.getElementById('calcFormulaBsFeePct').innerText = (bsFeePct * 100).toFixed(1);
+    document.getElementById('calcFormulaBsFee').innerText = formatEUR(fee);
+    document.getElementById('calcFormulaBsSparrate').innerText = formatEUR(R) + " / Mon.";
+
+    document.getElementById('calcFormulaEigenRVal').innerText = formatEUR(R);
+    document.getElementById('calcFormulaEigenRenditePct').innerText = (eigenRendite * 100).toFixed(1);
+    document.getElementById('calcFormulaEigenRenditePct2').innerText = (eigenRendite * 100).toFixed(1);
+    document.getElementById('calcFormulaEigenMonate').innerText = ansparMonate;
+    document.getElementById('calcFormulaEigenFinalGuthaben').innerText = formatEUR(fvEigen);
+
+    document.getElementById('calcFormulaTotalAnspar').innerText = formatEUR(totalSparEinzahlungen);
+    document.getElementById('calcFormulaBsFinalGuthaben').innerText = formatEUR(targetGuthaben);
+    document.getElementById('calcFormulaEigenZinsgewinn').innerText = formatEUR(fvEigen - totalSparEinzahlungen);
+
+    document.getElementById('calcFormulaBsMonateCount').innerText = bsSim.bsMonate;
+    document.getElementById('calcFormulaBsDarlehenPmtVal').innerText = formatEUR(bsDarlehen > 0.001 ? bsRateDarlehen : 0);
+    document.getElementById('calcFormulaBsDarlehenVal').innerText = formatEUR(bsDarlehen);
+    document.getElementById('calcFormulaBsDarlehenZinsenVal').innerText = formatEUR(bsSim.bsZinsenTotal);
+    document.getElementById('calcFormulaBsGapSumRaten').innerText = formatEUR(bsSim.gapRatenGesamt);
+    document.getElementById('calcFormulaBsGapSumVal').innerText = formatEUR(bsGapLoan);
+    document.getElementById('calcFormulaBsGapZinsen').innerText = formatEUR(bsSim.gapZinsenTotal);
+
+    document.getElementById('calcFormulaEigenMonateCount').innerText = eigenGapDetails.monate;
+    document.getElementById('calcFormulaEigenPmtVal').innerText = formatEUR(eigenGapDetails.pmt);
+    document.getElementById('calcFormulaEigenGapVal').innerText = formatEUR(eigenBankLoan);
+    document.getElementById('calcFormulaEigenZinsen').innerText = formatEUR(eigenGapDetails.zinsen);
+
+    document.getElementById('calcFormulaTotBsInit').innerText = formatEUR(initialPaidInPeriod);
+    document.getElementById('calcFormulaTotBsSpar').innerText = formatEUR(totalSparEinzahlungen);
+    document.getElementById('calcFormulaTotBsDarlehen').innerText = formatEUR(bsDarlehen + bsSim.bsZinsenTotal + bsSim.bsRestschuld);
+    document.getElementById('calcFormulaTotBsGap').innerText = formatEUR(bsGapLoan + bsSim.gapZinsenTotal + bsSim.gapRestschuld);
+    document.getElementById('calcFormulaTotBsSum').innerText = formatEUR(totalOutlayBS);
+
+    document.getElementById('calcFormulaTotEigenInit').innerText = formatEUR(initialPaidInPeriod);
+    document.getElementById('calcFormulaTotEigenSpar').innerText = formatEUR(totalSparEinzahlungen);
+    document.getElementById('calcFormulaTotEigenGap').innerText = formatEUR(eigenBankLoan + eigenGapDetails.zinsen + eigenGapDetails.restschuld);
+    document.getElementById('calcFormulaTotEigenSum').innerText = formatEUR(totalOutlayEigen);
+    document.getElementById('calcFormulaBreakEven').innerText = breakEvenRate === null
+        ? "keinem Zinssatz im Bereich 0–40 %"
+        : (breakEvenRate * 100).toFixed(2) + " % p.a.";
+
+    // ---------- Tabellen & Charts ----------
+    document.getElementById('tableContainerStep1').innerHTML = renderScheduleTable(step1Schedule);
+    document.getElementById('tableContainerStep3BSLoan').innerHTML = renderScheduleTable(bsSim.bsSchedule);
+    document.getElementById('tableContainerStep3BSGap').innerHTML = renderScheduleTable(bsSim.gapSchedule);
+    document.getElementById('tableContainerStep3EigenGap').innerHTML = renderScheduleTable(eigenGapDetails.schedule);
+
+    updateBarChart(initialPaidInPeriod, totalSparEinzahlungen, bsDarlehen, totalZinsenAnschlussBS, bsGapLoan, eigenBankLoan, eigenGapDetails.zinsen);
+    updateLineChart(curveLabels, curveData);
+}
+
+/* ============================================================
+   NEU: Barwert (NPV) über alle Zahlungsströme
+   Ansparphase (identisch in beiden Pfaden) + Anschlusspläne.
+   ============================================================ */
+function computeNPV(ansparMonate, pmtAnspar, schedules, d_m) {
+    let npv = 0;
+    for (let m = 1; m <= ansparMonate; m++) {
+        npv += pmtAnspar / Math.pow(1 + d_m, m);
+    }
+    schedules.forEach(sch => {
+        if (!sch) return;
+        sch.forEach(row => {
+            npv += row.pmt / Math.pow(1 + d_m, ansparMonate + row.m);
+        });
+    });
+    return npv;
+}
+
+function renderScheduleTable(schedule) {
+    if (!schedule || schedule.length === 0) {
+        return `<p class="text-slate-400 italic text-[11px] p-2 border rounded-lg bg-white">Kein Tilgungsbedarf vorhanden.</p>`;
+    }
+    let html = `
+    <div class="max-h-52 overflow-y-auto border border-slate-200 rounded-xl bg-white shadow-inner text-[11px]">
+        <table class="w-full text-left border-collapse">
+            <thead class="bg-slate-100 text-slate-700 font-semibold sticky top-0 border-b border-slate-200 z-10">
+                <tr>
+                    <th class="p-2 border-r border-slate-200">Monat</th>
+                    <th class="p-2 text-right border-r border-slate-200">Gesamtrate</th>
+                    <th class="p-2 text-right border-r border-slate-200 text-red-600">Zinsanteil</th>
+                    <th class="p-2 text-right border-r border-slate-200 text-emerald-600">Tilgungsanteil</th>
+                    <th class="p-2 text-right">Restschuld</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 font-mono">`;
+    schedule.forEach(row => {
+        html += `
+        <tr class="hover:bg-slate-50 transition-colors">
+            <td class="p-1.5 border-r border-slate-100 font-sans font-medium text-slate-600">${row.m}</td>
+            <td class="p-1.5 text-right border-r border-slate-100 font-semibold text-slate-800">${formatEUR(row.pmt)}</td>
+            <td class="p-1.5 text-right border-r border-slate-100 text-red-500">${formatEUR(row.intr)}</td>
+            <td class="p-1.5 text-right border-r border-slate-100 text-emerald-600">${formatEUR(row.prin)}</td>
+            <td class="p-1.5 text-right font-bold text-slate-900">${formatEUR(row.bal)}</td>
+        </tr>`;
+    });
+    html += `</tbody></table></div>`;
+    return html;
+}
+
+/* ============================================================
+   FIX 1 + FIX 2
+   ============================================================ */
+function runCombinedBausparAndGapLoan(bsLoanAmount, bsRatePct, bsTargetPmt, gapLoanAmount, gapRatePct, gapTilgungPct) {
+    let bsBal = bsLoanAmount;
+    let gapBal = gapLoanAmount;
+
+    const r_bs = bsRatePct / 12;
+    const r_gap = gapRatePct / 12;
+
+    // FIX 1: Ohne Bauspardarlehen existiert kein BS-Budget, das weitergereicht werden könnte.
+    const bsPmtEff = bsLoanAmount > 0.001 ? bsTargetPmt : 0;
+
+    // FIX 2: Rate muss den Monatszins übersteigen, sonst wächst der Saldo.
+    const bsMinPmt = bsLoanAmount * r_bs;
+    const bsRateZuNiedrig = bsLoanAmount > 0.001 && bsPmtEff <= bsMinPmt;
+
+    const initialGapPmt = gapLoanAmount > 0 ? (gapLoanAmount * (gapRatePct + gapTilgungPct) / 12) : 0;
+    const phase2GapPmt = initialGapPmt + bsPmtEff;
+
+    if (bsRateZuNiedrig) {
+        return {
+            bsMonate: 0, gapMonate: 0, gapPhase1Monate: 0, gapPhase2Monate: 0,
+            bsZinsenTotal: 0, gapZinsenTotal: 0, gapRatenGesamt: 0,
+            initialGapPmt: initialGapPmt, phase2GapPmt: phase2GapPmt,
+            bsSchedule: [], gapSchedule: [],
+            bsRestschuld: bsLoanAmount, gapRestschuld: gapLoanAmount,
+            fehler: `Rate ${formatEUR(bsPmtEff)} deckt den Monatszins ${formatEUR(bsMinPmt)} nicht.`
+        };
+    }
+
+    let bsZinsenTotal = 0, gapZinsenTotal = 0, gapRatenGesamt = 0;
+    let bsMonate = 0, gapPhase1Monate = 0, gapPhase2Monate = 0, m = 0;
+    const bsSchedule = [], gapSchedule = [];
+
+    while ((bsBal > 0.001 || gapBal > 0.001) && m < 1200) {
+        m++;
+
+        // 1. Bauspardarlehen
+        let actualBsPmtPaid = 0;
+        if (bsBal > 0.001) {
+            const intrBS = bsBal * r_bs;
+            const pmtBS = Math.min(bsPmtEff, bsBal + intrBS);
+            const prinBS = pmtBS - intrBS;
+            if (prinBS <= 0) break;                       // FIX 2: keine Negativtilgung
+            bsBal -= prinBS;
+            bsZinsenTotal += intrBS;
+            bsMonate = m;
+            actualBsPmtPaid = pmtBS;
+            bsSchedule.push({ m: m, pmt: pmtBS, intr: intrBS, prin: prinBS, bal: Math.max(0, bsBal) });
+        }
+
+        // 2. Banklücke
+        if (gapBal > 0.001) {
+            const freedBsBudget = bsPmtEff - actualBsPmtPaid;   // FIX 1
+            const effectiveGapPmt = initialGapPmt + Math.max(0, freedBsBudget);
+
+            const intrGap = gapBal * r_gap;
+            const pmtGap = Math.min(effectiveGapPmt, gapBal + intrGap);
+            const prinGap = pmtGap - intrGap;
+            if (prinGap <= 0) break;                      // FIX 2: keine Negativtilgung
+            gapBal -= prinGap;
+            gapZinsenTotal += intrGap;
+            gapRatenGesamt += pmtGap;
+
+            if (actualBsPmtPaid > 0) gapPhase1Monate++; else gapPhase2Monate++;
+
+            gapSchedule.push({ m: m, pmt: pmtGap, intr: intrGap, prin: prinGap, bal: Math.max(0, gapBal) });
+        }
+    }
+
+    return {
+        bsMonate: bsMonate,
+        gapMonate: gapPhase1Monate + gapPhase2Monate,
+        gapPhase1Monate: gapPhase1Monate,
+        gapPhase2Monate: gapPhase2Monate,
+        bsZinsenTotal: bsZinsenTotal,
+        gapZinsenTotal: gapZinsenTotal,
+        gapRatenGesamt: gapRatenGesamt,
+        initialGapPmt: initialGapPmt,
+        phase2GapPmt: bsLoanAmount > 0.001 ? phase2GapPmt : initialGapPmt,
+        bsSchedule: bsSchedule,
+        gapSchedule: gapSchedule,
+        // FIX 2/3: offene Restschulden explizit ausweisen statt verschwinden lassen
+        bsRestschuld: Math.max(0, bsBal),
+        gapRestschuld: Math.max(0, gapBal),
+        fehler: null
+    };
+}
+
+/* ============================================================
+   FIX 3: Ratenanhebung wird gemeldet, Restschuld ausgewiesen
+   ============================================================ */
+function runBankLoanDetailsByPmt(loanAmount, rate, monthlyPmt) {
+    if (loanAmount <= 0) return { pmt: 0, zinsen: 0, monate: 0, schedule: [], restschuld: 0, angehoben: false };
+
+    let bal = loanAmount;
+    const r = rate / 12;
+    let pmt = monthlyPmt;
+
+    // Mindestrate = Zins + 0,5 % Anfangstilgung p.a., damit die Tilgung real terminiert.
+    const minPmt = bal * (rate + 0.005) / 12;
+    const angehoben = pmt < minPmt;
+    if (angehoben) pmt = minPmt;
+
+    let zinsen = 0, m = 0;
+    const schedule = [];
+
+    while (bal > 0.01 && m < 1200) {
+        m++;
+        const intr = bal * r;
+        const currentPmt = Math.min(pmt, bal + intr);
+        const prin = currentPmt - intr;
+        if (prin <= 0) break;
+        bal -= prin;
+        zinsen += intr;
+        schedule.push({ m: m, pmt: currentPmt, intr: intr, prin: prin, bal: Math.max(0, bal) });
+    }
+
+    return { pmt: pmt, zinsen: zinsen, monate: m, schedule: schedule,
+             restschuld: Math.max(0, bal), angehoben: angehoben };
+}
+
+/* ============================================================
+   FIX 4: Break-Even nur bei echtem Vorzeichenwechsel
+   ============================================================ */
+function calculateBreakEvenForVollkosten(yieldRate, R, nMonate, restschuld, bsSumme, targetGuthaben,
+                                         bsSollzins, bsRateDarlehen, totalSparEinzahlungen,
+                                         initialPaidInPeriod, tilgung) {
+    const r_e = yieldRate / 12;
+    const fv = (r_e > 0) ? R * ((Math.pow(1 + r_e, nMonate) - 1) / r_e) : totalSparEinzahlungen;
+    const eigenGap = Math.max(0, restschuld - fv);
+
+    const bsDarlehen = Math.max(0, bsSumme - targetGuthaben);
+    const bsGapLoan = Math.max(0, restschuld - bsSumme);
+
+    // Differenz Eigen − BS bei gegebenem Bankzins i
+    const diffAt = (i) => {
+        const bsSim = runCombinedBausparAndGapLoan(bsDarlehen, bsSollzins, bsRateDarlehen, bsGapLoan, i, tilgung);
+        const totalBS = initialPaidInPeriod + totalSparEinzahlungen
+                      + bsDarlehen + bsSim.bsZinsenTotal + bsSim.bsRestschuld
+                      + bsGapLoan + bsSim.gapZinsenTotal + bsSim.gapRestschuld;
+
+        const combinedBS = (bsDarlehen > 0.001 ? bsRateDarlehen : 0) + bsSim.initialGapPmt;
+        const targetEigen = combinedBS > 0 ? combinedBS : (eigenGap * (i + tilgung) / 12);
+        const eigen = runBankLoanDetailsByPmt(eigenGap, i, targetEigen);
+        const totalEigen = initialPaidInPeriod + totalSparEinzahlungen
+                         + eigenGap + eigen.zinsen + eigen.restschuld;
+
+        return totalEigen - totalBS;
+    };
+
+    let low = 0.0001, high = 0.40;
+    const dLow = diffAt(low), dHigh = diffAt(high);
+
+    // Ohne Vorzeichenwechsel existiert kein Break-Even im Intervall.
+    if (!isFinite(dLow) || !isFinite(dHigh) || dLow * dHigh > 0) return null;
+
+    for (let i = 0; i < 60; i++) {
+        const mid = (low + high) / 2;
+        if (diffAt(mid) * dLow <= 0) high = mid; else low = mid;
+    }
+    return (low + high) / 2;
+}
+
+function formatEUR(val, withSymbol = true) {
+    if (!isFinite(val)) val = 0;
+    const formatted = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }).format(val);
+    return withSymbol ? formatted + " €" : formatted;
+}
+
+function formatDuration(months) {
+    if (months <= 0) return "0 Mon.";
+    const yrs = Math.floor(months / 12);
+    const m = months % 12;
+    if (yrs === 0) return `${m} Mon.`;
+    if (m === 0) return `${yrs} J.`;
+    return `${yrs} J. ${m} M.`;
+}
+
+function updateBarChart(initialPaid, sparraten, bsDarlehen, bsZinsen, bsGap, eigenGap, eigenZinsen) {
+    const ctx = document.getElementById('barChart').getContext('2d');
+    if (barChart) barChart.destroy();
+    barChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Mit Bausparvertrag', 'Mit Eigenanlage'],
+            datasets: [
+                { label: 'Gezahlt Erstfinanzierung', data: [initialPaid, initialPaid], backgroundColor: '#94a3b8' },
+                { label: 'Akkumulierte Sparrate', data: [sparraten, sparraten], backgroundColor: '#64748b' },
+                { label: 'BS-Darlehen / Eigenkapital', data: [bsDarlehen, 0], backgroundColor: '#f59e0b' },
+                { label: 'Finanzierungslücke Bank (Tilgung)', data: [bsGap, eigenGap], backgroundColor: '#3b82f6' },
+                { label: 'Zinskosten Anschlussphase', data: [bsZinsen, eigenZinsen], backgroundColor: '#ef4444' }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => (v / 1000) + ' k€' } } },
+            plugins: { tooltip: { callbacks: { label: c => c.dataset.label + ': ' + formatEUR(c.raw) } } }
+        }
+    });
+}
+
+function updateLineChart(labels, dataPoints) {
+    const ctx = document.getElementById('lineChart').getContext('2d');
+    if (lineChart) lineChart.destroy();
+    lineChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Kritischer Bankzins (%)',
+                data: dataPoints,
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                fill: true, tension: 0.3, pointRadius: 4, pointHoverRadius: 6,
+                spanGaps: false
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { title: { display: true, text: 'Netto-Rendite Eigenanlage (% p.a.)', font: { size: 10 } } },
+                y: { title: { display: true, text: 'Kritischer Bankzins (% p.a.)', font: { size: 10 } }, ticks: { callback: v => v.toFixed(1) + ' %' } }
+            },
+            plugins: { tooltip: { callbacks: { label: c => c.raw === null ? 'Kein Break-Even' : 'Kritischer Bankzins: ' + c.raw.toFixed(2) + ' %' } } }
+        }
+    });
+}
+
+const inputIds = [
+    'initSumme', 'initZins', 'initTilgung', 'ansparJahre',
+    'bsSumme', 'bsFeePct', 'bsMinPct', 'bsGuthabenZins', 'bsSollzins', 'bsRateDarlehen',
+    'eigenRendite', 'bankBauzins', 'bankTilgung', 'diskontZins'
+];
+inputIds.forEach(id => document.getElementById(id).addEventListener('input', calculate));
+
+calculate();
+</script>
+</body>
+</html>
