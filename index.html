@@ -70,6 +70,7 @@
       <div><label class="text-xs font-medium text-slate-600">Kreditsumme (€)</label><input type="number" id="initSumme" value="440000" step="5000" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
       <div><label class="text-xs font-medium text-slate-600">Sollzins p.a. (%)</label><input type="number" id="initZins" value="3.80" step="0.05" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
       <div><label class="text-xs font-medium text-slate-600">Anfängliche Tilgung (%)</label><input type="number" id="initTilgung" value="2.00" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
+      <div><label class="text-xs font-medium text-slate-600">Optionale Ziel-Monatsrate (€)</label><input type="number" id="targetMonatsrate" value="" step="25" min="0" placeholder="z. B. 2500" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"><p class="text-[10px] text-slate-400 mt-1">Bei Eingabe werden Tilgungen und BS-Zuteilung automatisch auf möglichst konstante Gesamtrate kalibriert.</p></div>
       <div><label class="text-xs font-medium text-slate-600">Zinsbindung Erstkredit (Jahre)</label><input type="number" id="zinsbindungJahre" value="10" step="1" min="1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
     </div>
 
@@ -353,6 +354,50 @@ function formatDuration(months) {
     return `${yrs} J. ${m} M.`;
 }
 
+const INPUT_HELP_TEXTS = {
+    initSumme: "Auszahlungsbetrag des Erstkredits zu Beginn der Finanzierung.",
+    initZins: "Nominalzins des Erstkredits pro Jahr während der Zinsbindung.",
+    initTilgung: "Anfänglicher jährlicher Tilgungssatz des Erstkredits.",
+    targetMonatsrate: "Optionales Ziel für eine möglichst konstante monatliche Gesamtbelastung über die gesamte Finanzierung.",
+    zinsbindungJahre: "Dauer, für die der Sollzins des Erstkredits festgeschrieben ist.",
+    bsSumme: "Vertraglich vereinbarte Bausparsumme aus Guthaben plus möglichem Bauspardarlehen.",
+    bsZuteilungJahre: "Geplanter Zeitpunkt der Bauspar-Zuteilung in Jahren.",
+    bsFeePct: "Abschlussgebühr in Prozent der Bausparsumme.",
+    bsMinPct: "Mindestansparquote bis zur Zuteilung in Prozent der Bausparsumme.",
+    bsGuthabenZins: "Verzinsung des Bausparguthabens pro Jahr.",
+    bsSollzins: "Sollzins des Bauspardarlehens pro Jahr.",
+    bsRateDarlehen: "Monatliche Rate für das Bauspardarlehen nach Zuteilung.",
+    eigenRendite: "Erwartete jährliche Netto-Rendite der alternativen Eigenanlage.",
+    bankBauzins: "Erwarteter Sollzins des Bank-Anschlusskredits pro Jahr.",
+    bankTilgung: "Jährlicher Tilgungssatz für Bank-Anschluss- bzw. Lückenkredite.",
+    sondertilgungPct: "Maximal mögliche Sondertilgung pro Jahr in Prozent der Ursprungssumme.",
+    zwischenZins: "Sollzins des Zwischendarlehens pro Jahr (relevant in Fall A).",
+    parkZins: "Verzinsung für nicht sondertilgbares, zwischengeparktes Guthaben.",
+    diskontZins: "Diskontsatz für den laufzeitbereinigten Barwertvergleich (NPV)."
+};
+
+function decorateInputLabelsWithInfo() {
+    Object.entries(INPUT_HELP_TEXTS).forEach(([id, helpText]) => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        const wrapper = input.parentElement;
+        if (!wrapper) return;
+        const label = wrapper.querySelector('label');
+        if (!label || label.dataset.infoDecorated === "1") return;
+
+        label.classList.add('flex', 'items-center', 'gap-1');
+        const icon = document.createElement('span');
+        icon.className = 'inline-flex items-center justify-center w-4 h-4 rounded-full border border-slate-300 text-[10px] leading-none text-slate-500 cursor-help select-none';
+        icon.textContent = "i";
+        icon.title = helpText;
+        icon.setAttribute('aria-label', helpText);
+        label.appendChild(icon);
+        label.dataset.infoDecorated = "1";
+
+        if (!input.title) input.title = helpText;
+    });
+}
+
 /* Läuft exakt `months` Monate lang mit fixer Rate `pmt` (kein Abbruch bei
    Volltilgung, kein Deckel bei Negativtilgung – bewusst begrenzt durch
    `months`, damit auch eine zu geringe Zwischendarlehensrate keine
@@ -552,6 +597,122 @@ function computeNPV(phases, d_m) {
         }
     });
     return npv;
+}
+
+function buildMonthlyTotalsFromPhases(phases) {
+    const totals = [];
+    phases.forEach(ph => {
+        if (!ph) return;
+        if (ph.pmt !== undefined && Number.isFinite(ph.months)) {
+            for (let m = 1; m <= ph.months; m++) {
+                const absMonth = ph.start + m;
+                totals[absMonth] = (totals[absMonth] || 0) + ph.pmt;
+            }
+        } else if (ph.schedule) {
+            ph.schedule.forEach(row => {
+                const absMonth = ph.start + row.m;
+                totals[absMonth] = (totals[absMonth] || 0) + row.pmt;
+            });
+        }
+    });
+    return totals.filter((v, i) => i > 0 && Number.isFinite(v));
+}
+
+function scoreTargetMonthlyRate(monthlyTotals, targetRate) {
+    if (!(Number.isFinite(targetRate) && targetRate > 0) || monthlyTotals.length === 0) return Number.POSITIVE_INFINITY;
+    let absDevSum = 0;
+    let maxDev = 0;
+    for (const payment of monthlyTotals) {
+        const dev = Math.abs(payment - targetRate);
+        absDevSum += dev;
+        if (dev > maxDev) maxDev = dev;
+    }
+    const meanAbsDev = absDevSum / monthlyTotals.length;
+    return meanAbsDev + (0.35 * maxDev);
+}
+
+function deriveInitTilgungForTargetRate(p, zuteilungJahre, targetRate) {
+    if (!(p.initSumme > 0)) return 0.001;
+    const zMonate = Math.max(1, Math.round(zuteilungJahre * 12));
+    const fee = p.bsSumme * p.bsFeePct;
+    const targetGuthaben = p.bsSumme * p.bsMinPct;
+    const r_bs_anspar = p.bsGuthabenZins / 12;
+    let factor_bs = zMonate;
+    if (r_bs_anspar > 0) factor_bs = (Math.pow(1 + r_bs_anspar, zMonate) - 1) / r_bs_anspar;
+    const fv_fee = fee * Math.pow(1 + r_bs_anspar, zMonate);
+    const R = factor_bs > 0 ? (targetGuthaben + fv_fee) / factor_bs : 0;
+
+    const minInitRate = p.initSumme * (p.initZins + 0.005) / 12;
+    const desiredInitRate = targetRate - R;
+    const safeInitRate = Math.max(minInitRate, desiredInitRate);
+    const initTilgung = (safeInitRate * 12 / p.initSumme) - p.initZins;
+    return Math.max(0.001, Math.min(0.20, initTilgung));
+}
+
+function calibrateParamsForTargetMonthlyRate(baseParams) {
+    const targetRate = baseParams.targetMonatsrate;
+    if (!(Number.isFinite(targetRate) && targetRate > 0)) {
+        return { params: baseParams, applied: false, warnungen: [] };
+    }
+    if (!(baseParams.initSumme > 0)) {
+        return {
+            params: baseParams,
+            applied: false,
+            warnungen: ["Ziel-Monatsrate aktiv, aber Kreditsumme ist 0 € – automatische Kalibrierung wurde übersprungen."]
+        };
+    }
+
+    const evaluateCandidate = (zuteilungJahre, bankTilgung) => {
+        const initTilgung = deriveInitTilgungForTargetRate(baseParams, zuteilungJahre, targetRate);
+        const candidate = Object.assign({}, baseParams, { bsZuteilungJahre: zuteilungJahre, initTilgung, bankTilgung });
+        const model = computeModel(candidate);
+        const monthlyTotals = buildMonthlyTotalsFromPhases(model.npvPhasesBS || []);
+        const score = scoreTargetMonthlyRate(monthlyTotals, targetRate);
+        return { candidate, monthlyTotals, score };
+    };
+
+    let best = null;
+    for (let zuteilungJahre = 1; zuteilungJahre <= 50; zuteilungJahre++) {
+        for (let bankTilgung = 0.005; bankTilgung <= 0.1200001; bankTilgung += 0.005) {
+            const attempt = evaluateCandidate(zuteilungJahre, bankTilgung);
+            if (!Number.isFinite(attempt.score)) continue;
+            if (!best || attempt.score < best.score) best = attempt;
+        }
+    }
+
+    if (!best) {
+        return {
+            params: baseParams,
+            applied: false,
+            warnungen: ["Für die angegebene Ziel-Monatsrate konnte keine stabile Kalibrierung gefunden werden."]
+        };
+    }
+
+    const bestZ = best.candidate.bsZuteilungJahre;
+    const bestTilg = best.candidate.bankTilgung;
+    for (let zuteilungJahre = Math.max(1, bestZ - 2); zuteilungJahre <= Math.min(50, bestZ + 2); zuteilungJahre++) {
+        for (let bankTilgung = Math.max(0.005, bestTilg - 0.01); bankTilgung <= Math.min(0.12, bestTilg + 0.01) + 1e-12; bankTilgung += 0.001) {
+            const attempt = evaluateCandidate(zuteilungJahre, bankTilgung);
+            if (!Number.isFinite(attempt.score)) continue;
+            if (attempt.score < best.score) best = attempt;
+        }
+    }
+
+    const count = best.monthlyTotals.length || 1;
+    const avgRate = best.monthlyTotals.reduce((s, v) => s + v, 0) / count;
+    const maxDev = best.monthlyTotals.reduce((m, v) => Math.max(m, Math.abs(v - targetRate)), 0);
+    const warnungen = [
+        `Ziel-Monatsrate aktiv: init. Tilgung auf ${(best.candidate.initTilgung * 100).toFixed(2)} %, BS-Zuteilung auf ${best.candidate.bsZuteilungJahre} Jahre und Bank-Tilgung auf ${(best.candidate.bankTilgung * 100).toFixed(2)} % kalibriert.`
+    ];
+    if (maxDev > targetRate * 0.08) {
+        warnungen.push(`Die Zielrate ${formatEUR(targetRate)} kann nicht in allen Phasen exakt gehalten werden (max. Abweichung: ${formatEUR(maxDev)}, Ø: ${formatEUR(avgRate)}).`);
+    }
+
+    return {
+        params: best.candidate,
+        applied: true,
+        warnungen
+    };
 }
 
 /* ============================================================
@@ -964,6 +1125,7 @@ function readInputs(warnungen) {
         initSumme:        parseFloat(document.getElementById('initSumme').value) || 0,
         initZins:        (parseFloat(document.getElementById('initZins').value) || 0) / 100,
         initTilgung:     (parseFloat(document.getElementById('initTilgung').value) || 0) / 100,
+        targetMonatsrate: parseFloat(document.getElementById('targetMonatsrate').value) || 0,
         zinsbindungJahre: parsePositiveYears(document.getElementById('zinsbindungJahre').value, 'Zinsbindung Erstkredit (Jahre)', warnungen),
         bsZuteilungJahre: parsePositiveYears(document.getElementById('bsZuteilungJahre').value, 'BS-Zuteilungszeitpunkt (Jahre)', warnungen),
 
@@ -986,10 +1148,17 @@ function readInputs(warnungen) {
 
 function calculate() {
     const inputWarnungen = [];
-    const p = readInputs(inputWarnungen);
+    const pRaw = readInputs(inputWarnungen);
+    const calibration = calibrateParamsForTargetMonthlyRate(pRaw);
+    const p = calibration.params;
+    if (calibration.applied) {
+        document.getElementById('initTilgung').value = (p.initTilgung * 100).toFixed(2);
+        document.getElementById('bsZuteilungJahre').value = String(p.bsZuteilungJahre);
+        document.getElementById('bankTilgung').value = (p.bankTilgung * 100).toFixed(2);
+    }
     const model = computeModel(p);
     model.p = p;
-    model.warnungen = inputWarnungen.concat(model.warnungen);
+    model.warnungen = inputWarnungen.concat(calibration.warnungen || [], model.warnungen);
 
     const zinsbindungMonate = model.zinsbindungMonate;
     const zuteilungMonate = model.zuteilungMonate;
@@ -1249,7 +1418,7 @@ function calculate() {
 }
 
 const inputIds = [
-    'initSumme', 'initZins', 'initTilgung', 'zinsbindungJahre',
+    'initSumme', 'initZins', 'initTilgung', 'targetMonatsrate', 'zinsbindungJahre',
     'bsSumme', 'bsZuteilungJahre', 'bsFeePct', 'bsMinPct', 'bsGuthabenZins', 'bsSollzins', 'bsRateDarlehen',
     'eigenRendite', 'bankBauzins', 'bankTilgung', 'sondertilgungPct', 'zwischenZins', 'parkZins', 'diskontZins'
 ];
@@ -1262,6 +1431,7 @@ function calculateDebounced() {
 }
 inputIds.forEach(id => document.getElementById(id).addEventListener('input', calculateDebounced));
 
+decorateInputLabelsWithInfo();
 calculate();
 
 </script>
