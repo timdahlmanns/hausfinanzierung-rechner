@@ -664,7 +664,8 @@ function renderTopConfigsTable(configs) {
             <td class="py-1.5 px-2 text-right">${(c.bankTilgung * 100).toFixed(2)} %</td>
             <td class="py-1.5 px-2 text-right font-bold">${formatEUR(c.totalOutlayBS)}</td>
             <td class="py-1.5 px-2 text-right font-bold">${formatEUR(c.totalOutlayEigen)}</td>
-            <td class="py-1.5 px-2 text-right font-bold">${formatEUR(c.combinedOutlay)}</td>
+            <td class="py-1.5 px-2 text-right">${c.rankBS}</td>
+            <td class="py-1.5 px-2 text-right">${c.rankEigen}</td>
         </tr>
     `).join("");
     return `
@@ -678,7 +679,8 @@ function renderTopConfigsTable(configs) {
                         <th class="py-1.5 px-2 text-right">Bank-Tilgung</th>
                         <th class="py-1.5 px-2 text-right">Gesamt mit BS</th>
                         <th class="py-1.5 px-2 text-right">Gesamt ohne BS</th>
-                        <th class="py-1.5 px-2 text-right">Summe beider</th>
+                        <th class="py-1.5 px-2 text-right">Rang BS</th>
+                        <th class="py-1.5 px-2 text-right">Rang ohne BS</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
@@ -740,33 +742,9 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
         return true;
     };
 
-    const compareLexicographic = (a, b) => {
-        if (!b) return true;
-        if (a.combinedOutlay < b.combinedOutlay - COST_EPS) return true;
-        if (Math.abs(a.combinedOutlay - b.combinedOutlay) <= COST_EPS) {
-            const aWorse = Math.max(a.totalOutlayBS, a.totalOutlayEigen);
-            const bWorse = Math.max(b.totalOutlayBS, b.totalOutlayEigen);
-            if (aWorse < bWorse - COST_EPS) return true;
-            if (Math.abs(aWorse - bWorse) <= COST_EPS) {
-                if (a.alignmentGap < b.alignmentGap - ALIGN_EPS) return true;
-                if (Math.abs(a.alignmentGap - b.alignmentGap) <= ALIGN_EPS) {
-                    if (a.fitScore < b.fitScore - FIT_EPS) return true;
-                    if (Math.abs(a.fitScore - b.fitScore) <= FIT_EPS) {
-                        if (a.runtimeMonths < b.runtimeMonths) return true;
-                        if (a.runtimeMonths === b.runtimeMonths && a.peakPayment < b.peakPayment) return true;
-                    }
-                }
-            }
-        }
-        return false;
-    };
-    const sortLexicographic = (a, b) => {
-        if (a.combinedOutlay < b.combinedOutlay - COST_EPS) return -1;
-        if (b.combinedOutlay < a.combinedOutlay - COST_EPS) return 1;
-        const aWorse = Math.max(a.totalOutlayBS, a.totalOutlayEigen);
-        const bWorse = Math.max(b.totalOutlayBS, b.totalOutlayEigen);
-        if (aWorse < bWorse - COST_EPS) return -1;
-        if (bWorse < aWorse - COST_EPS) return 1;
+    const compareByPathCost = (a, b, fieldName) => {
+        if (a[fieldName] < b[fieldName] - COST_EPS) return -1;
+        if (b[fieldName] < a[fieldName] - COST_EPS) return 1;
         if (a.alignmentGap < b.alignmentGap - ALIGN_EPS) return -1;
         if (b.alignmentGap < a.alignmentGap - ALIGN_EPS) return 1;
         if (a.fitScore < b.fitScore - FIT_EPS) return -1;
@@ -788,7 +766,6 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
             model,
             totalOutlayBS: model.totalOutlayBS,
             totalOutlayEigen: model.totalOutlayEigen,
-            combinedOutlay: model.totalOutlayBS + model.totalOutlayEigen,
             alignmentGap: Math.abs(baseParams.zinsbindungJahre - zuteilungJahre),
             fitScore: fit.score,
             meanAbsDev: fit.meanAbsDev,
@@ -809,17 +786,19 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
         if (!feasibleByKey.has(key)) feasibleByKey.set(key, attempt);
     };
 
-    let best = null;
+    let coarseBestBS = null;
+    let coarseBestEigen = null;
     for (let zuteilungJahre = 1; zuteilungJahre <= 50; zuteilungJahre += 1) {
         for (let bankTilgung = MIN_BANK_TILG; bankTilgung <= MAX_BANK_TILG + 1e-12; bankTilgung += 0.005) {
             const attempt = evaluateCandidate(zuteilungJahre, bankTilgung);
             addFeasibleCandidate(attempt);
             if (!attempt) continue;
-            if (compareLexicographic(attempt, best)) best = attempt;
+            if (!coarseBestBS || compareByPathCost(attempt, coarseBestBS, 'totalOutlayBS') < 0) coarseBestBS = attempt;
+            if (!coarseBestEigen || compareByPathCost(attempt, coarseBestEigen, 'totalOutlayEigen') < 0) coarseBestEigen = attempt;
         }
     }
 
-    if (!best) {
+    if (!coarseBestBS && !coarseBestEigen) {
         return {
             params: baseParams,
             applied: false,
@@ -827,20 +806,69 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
         };
     }
 
-    const bestZ = best.candidate.bsZuteilungJahre;
-    const bestTilg = best.candidate.bankTilgung;
-    for (let zuteilungJahre = Math.max(1, bestZ - 2); zuteilungJahre <= Math.min(50, bestZ + 2) + 1e-12; zuteilungJahre += 0.25) {
-        for (let bankTilgung = Math.max(MIN_BANK_TILG, bestTilg - 0.01); bankTilgung <= Math.min(MAX_BANK_TILG, bestTilg + 0.01) + 1e-12; bankTilgung += 0.001) {
-            const attempt = evaluateCandidate(zuteilungJahre, bankTilgung);
-            addFeasibleCandidate(attempt);
-            if (!attempt) continue;
-            if (compareLexicographic(attempt, best)) best = attempt;
+    const refineAround = (center) => {
+        if (!center) return;
+        const bestZ = center.candidate.bsZuteilungJahre;
+        const bestTilg = center.candidate.bankTilgung;
+        for (let zuteilungJahre = Math.max(1, bestZ - 2); zuteilungJahre <= Math.min(50, bestZ + 2) + 1e-12; zuteilungJahre += 0.25) {
+            for (let bankTilgung = Math.max(MIN_BANK_TILG, bestTilg - 0.01); bankTilgung <= Math.min(MAX_BANK_TILG, bestTilg + 0.01) + 1e-12; bankTilgung += 0.001) {
+                const attempt = evaluateCandidate(zuteilungJahre, bankTilgung);
+                addFeasibleCandidate(attempt);
+            }
         }
-    }
+    };
+    refineAround(coarseBestBS);
+    refineAround(coarseBestEigen);
+
+    const feasible = Array.from(feasibleByKey.values());
+    const sortByBS = (a, b) => compareByPathCost(a, b, 'totalOutlayBS');
+    const sortByEigen = (a, b) => compareByPathCost(a, b, 'totalOutlayEigen');
+
+    const rankedBS = [...feasible].sort(sortByBS);
+    const rankedEigen = [...feasible].sort(sortByEigen);
+
+    const rankBSByKey = new Map();
+    const rankEigenByKey = new Map();
+    const getKey = (x) => [
+        x.candidate.initTilgung.toFixed(6),
+        x.candidate.bsZuteilungJahre.toFixed(4),
+        x.candidate.bankTilgung.toFixed(6)
+    ].join("|");
+    rankedBS.forEach((x, idx) => rankBSByKey.set(getKey(x), idx + 1));
+    rankedEigen.forEach((x, idx) => rankEigenByKey.set(getKey(x), idx + 1));
+
+    const TOP_POOL_SIZE = 60;
+    const topPoolMap = new Map();
+    rankedBS.slice(0, TOP_POOL_SIZE).forEach(x => topPoolMap.set(getKey(x), x));
+    rankedEigen.slice(0, TOP_POOL_SIZE).forEach(x => topPoolMap.set(getKey(x), x));
+
+    const topPool = Array.from(topPoolMap.values());
+    const sortMergedTop = (a, b) => {
+        const aKey = getKey(a), bKey = getKey(b);
+        const aRankBS = rankBSByKey.get(aKey) || Number.MAX_SAFE_INTEGER;
+        const bRankBS = rankBSByKey.get(bKey) || Number.MAX_SAFE_INTEGER;
+        const aRankEigen = rankEigenByKey.get(aKey) || Number.MAX_SAFE_INTEGER;
+        const bRankEigen = rankEigenByKey.get(bKey) || Number.MAX_SAFE_INTEGER;
+        const aWorstRank = Math.max(aRankBS, aRankEigen);
+        const bWorstRank = Math.max(bRankBS, bRankEigen);
+        if (aWorstRank !== bWorstRank) return aWorstRank - bWorstRank;
+        const aRankSum = aRankBS + aRankEigen;
+        const bRankSum = bRankBS + bRankEigen;
+        if (aRankSum !== bRankSum) return aRankSum - bRankSum;
+        if (a.alignmentGap < b.alignmentGap - ALIGN_EPS) return -1;
+        if (b.alignmentGap < a.alignmentGap - ALIGN_EPS) return 1;
+        if (a.fitScore < b.fitScore - FIT_EPS) return -1;
+        if (b.fitScore < a.fitScore - FIT_EPS) return 1;
+        if (a.runtimeMonths !== b.runtimeMonths) return a.runtimeMonths - b.runtimeMonths;
+        return a.peakPayment - b.peakPayment;
+    };
+
+    const mergedRanked = topPool.sort(sortMergedTop);
+    const best = mergedRanked[0] || rankedBS[0] || rankedEigen[0];
 
     const avgRate = best.monthlyTotals.reduce((s, v) => s + v, 0) / (best.monthlyTotals.length || 1);
     const warnungen = [
-        `Ziel-Monatsrate aktiv (lexikografisch, harte Bandbreite ${formatEUR(minAllowedRate)} bis ${formatEUR(maxAllowedRate)}): Primär wurde die kombinierte Gesamtsumme (mit + ohne BS) minimiert, danach der schlechtere der beiden Pfade, dann |Zinsbindung−Zuteilung| und zuletzt die Ratenabweichung. Ergebnis: init. Tilgung ${(best.candidate.initTilgung * 100).toFixed(2)} %, BS-Zuteilung ${best.candidate.bsZuteilungJahre.toFixed(2)} Jahre, Bank-Tilgung ${(best.candidate.bankTilgung * 100).toFixed(2)} %.`
+        `Ziel-Monatsrate aktiv (harte Bandbreite ${formatEUR(minAllowedRate)} bis ${formatEUR(maxAllowedRate)}): Es werden Top-Konfigurationen für beide Pfade getrennt gesucht (mit BS und ohne BS), dann aus der Gesamtmenge zusammengeführt und die besten gewählt. Ergebnis: init. Tilgung ${(best.candidate.initTilgung * 100).toFixed(2)} %, BS-Zuteilung ${best.candidate.bsZuteilungJahre.toFixed(2)} Jahre, Bank-Tilgung ${(best.candidate.bankTilgung * 100).toFixed(2)} %.`
     ];
     if (best.maxDev > targetRate * 0.08) {
         warnungen.push(`Die Zielrate ${formatEUR(targetRate)} kann nicht in allen Phasen exakt gehalten werden (max. Abweichung: ${formatEUR(best.maxDev)}, Ø: ${formatEUR(avgRate)}).`);
@@ -850,17 +878,20 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
         params: best.candidate,
         applied: true,
         warnungen,
-        topConfigs: Array.from(feasibleByKey.values())
-            .sort(sortLexicographic)
+        topConfigs: mergedRanked
             .slice(0, 10)
-            .map(x => ({
+            .map((x) => {
+                const key = getKey(x);
+                return {
                 initTilgung: x.candidate.initTilgung,
                 bsZuteilungJahre: x.candidate.bsZuteilungJahre,
                 bankTilgung: x.candidate.bankTilgung,
                 totalOutlayBS: x.totalOutlayBS,
                 totalOutlayEigen: x.totalOutlayEigen,
-                combinedOutlay: x.combinedOutlay
-            }))
+                rankBS: rankBSByKey.get(key),
+                rankEigen: rankEigenByKey.get(key)
+                };
+            })
     };
 }
 
