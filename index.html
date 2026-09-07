@@ -417,7 +417,7 @@ function generateParkSchedule(amount, ratePct, months) {
 /* ============================================================
    FIX 1 + FIX 2 (V4.0, unverändert beibehalten)
    ============================================================ */
-function runCombinedBausparAndGapLoan(bsLoanAmount, bsRatePct, bsTargetPmt, gapLoanAmount, gapRatePct, gapTilgungPct) {
+function runCombinedBausparAndGapLoan(bsLoanAmount, bsRatePct, bsTargetPmt, gapLoanAmount, gapRatePct, gapTilgungPct, targetCombinedPmt = null) {
     let bsBal = bsLoanAmount;
     let gapBal = gapLoanAmount;
 
@@ -429,8 +429,11 @@ function runCombinedBausparAndGapLoan(bsLoanAmount, bsRatePct, bsTargetPmt, gapL
     const bsMinPmt = bsLoanAmount * r_bs;
     const bsRateZuNiedrig = bsLoanAmount > 0.001 && bsPmtEff <= bsMinPmt;
 
-    const initialGapPmt = gapLoanAmount > 0 ? (gapLoanAmount * (gapRatePct + gapTilgungPct) / 12) : 0;
-    const phase2GapPmt = initialGapPmt + bsPmtEff;
+    const hasTargetCombinedPmt = isFinite(targetCombinedPmt) && targetCombinedPmt > 0;
+    const initialGapPmt = gapLoanAmount > 0
+        ? (hasTargetCombinedPmt ? Math.max(0, targetCombinedPmt - bsPmtEff) : (gapLoanAmount * (gapRatePct + gapTilgungPct) / 12))
+        : 0;
+    const phase2GapPmt = hasTargetCombinedPmt ? targetCombinedPmt : (initialGapPmt + bsPmtEff);
 
     if (bsRateZuNiedrig) {
         return {
@@ -465,7 +468,9 @@ function runCombinedBausparAndGapLoan(bsLoanAmount, bsRatePct, bsTargetPmt, gapL
 
         if (gapBal > 0.001) {
             const freedBsBudget = bsPmtEff - actualBsPmtPaid;
-            const effectiveGapPmt = initialGapPmt + Math.max(0, freedBsBudget);
+            const effectiveGapPmt = hasTargetCombinedPmt
+                ? Math.max(0, targetCombinedPmt - actualBsPmtPaid)
+                : (initialGapPmt + Math.max(0, freedBsBudget));
 
             const intrGap = gapBal * r_gap;
             const pmtGap = Math.min(effectiveGapPmt, gapBal + intrGap);
@@ -568,19 +573,13 @@ function pushBsSimWarnungen(warnungen, bsSim) {
 }
 
 // Rate, die der BS-Pfad unmittelbar nach Bereitstellung von Bauspardarlehen +
-// Banklücke zahlt (Basis für die Budget-Paritätsrate der Eigenanlage).
+// Banklücke zahlt (für UI/Transparenzzwecke).
 function computeInitialCombinedRateBS(bsDarlehen, p, bsSim) {
     return (bsDarlehen > 0.001 ? p.bsRateDarlehen : 0) + bsSim.initialGapPmt;
 }
 
 function pushEigenGapWarnung(warnungen, eigenGapDetails) {
     if (eigenGapDetails.restschuld > 1) warnungen.push(`Bankkredit (Eigenanlage-Pfad) wird nicht vollständig getilgt – offene Restschuld: ${formatEUR(eigenGapDetails.restschuld)}.`);
-}
-
-// Paritätsrate für den Eigenanlage-Bankkredit: identisch zur BS-Kombinationsrate,
-// oder – falls es keine gibt (kein BS-/Gap-Darlehen) – annuitätische Standardrate.
-function computeTargetEigenRate(initialCombinedRateBS, eigenBankLoan, p) {
-    return initialCombinedRateBS > 0 ? initialCombinedRateBS : (eigenBankLoan * (p.bankBauzins + p.bankTilgung) / 12);
 }
 
 function computeModel(p) {
@@ -640,12 +639,12 @@ function computeModel(p) {
     if (fall === 'B') {
         const calculatedRestschuld = restschuldZB;
         const bsGapLoan = Math.max(0, calculatedRestschuld - p.bsSumme);
-        const bsSim = runCombinedBausparAndGapLoan(bsDarlehen, p.bsSollzins, p.bsRateDarlehen, bsGapLoan, p.bankBauzins, p.bankTilgung);
+        const bsSim = runCombinedBausparAndGapLoan(bsDarlehen, p.bsSollzins, p.bsRateDarlehen, bsGapLoan, p.bankBauzins, p.bankTilgung, pmt_anspar_gesamt);
         pushBsSimWarnungen(warnungen, bsSim);
 
         const initialCombinedRateBS = computeInitialCombinedRateBS(bsDarlehen, p, bsSim);
         const eigenBankLoan = Math.max(0, calculatedRestschuld - fvEigenAtZuteilung);
-        const targetEigenRate = computeTargetEigenRate(initialCombinedRateBS, eigenBankLoan, p);
+        const targetEigenRate = pmt_anspar_gesamt;
         const eigenGapDetails = runBankLoanDetailsByPmt(eigenBankLoan, p.bankBauzins, targetEigenRate);
         if (eigenGapDetails.angehoben) warnungen.push(`Budget-Parität verletzt: Die Rate des Eigenanlage-Bankkredits musste von ${formatEUR(targetEigenRate)} auf ${formatEUR(eigenGapDetails.pmt)} angehoben werden.`);
         pushEigenGapWarnung(warnungen, eigenGapDetails);
@@ -673,7 +672,7 @@ function computeModel(p) {
         const zwischenRestschuld = zwischenResult.restschuld;
 
         const bsGapLoan = Math.max(0, zwischenRestschuld - p.bsSumme);
-        const bsSim = runCombinedBausparAndGapLoan(bsDarlehen, p.bsSollzins, p.bsRateDarlehen, bsGapLoan, p.bankBauzins, p.bankTilgung);
+        const bsSim = runCombinedBausparAndGapLoan(bsDarlehen, p.bsSollzins, p.bsRateDarlehen, bsGapLoan, p.bankBauzins, p.bankTilgung, pmt_anspar_gesamt);
         pushBsSimWarnungen(warnungen, bsSim);
         warnungen.push("Fall A: Die Zwischenfinanzierung wird nur für den BS-Pfad benötigt (Bausparguthaben & -darlehen liegen erst bei Zuteilung vor). Die Ablösung durch Bausparguthaben und -darlehen wird ohne Vorfälligkeitsentschädigung modelliert – das setzt voraus, dass die Zinsbindung des Zwischendarlehens passend zum Zuteilungstermin gewählt wird.");
 
@@ -742,7 +741,7 @@ function computeModel(p) {
         }
         const restschuldZBBs = step1BSWeiter.restschuld;
         const bsGapLoan = Math.max(0, restschuldZBBs - parkFV_BS - bsDarlehen);
-        const bsSim = runCombinedBausparAndGapLoan(bsDarlehen, p.bsSollzins, p.bsRateDarlehen, bsGapLoan, p.bankBauzins, p.bankTilgung);
+        const bsSim = runCombinedBausparAndGapLoan(bsDarlehen, p.bsSollzins, p.bsRateDarlehen, bsGapLoan, p.bankBauzins, p.bankTilgung, pmt_anspar_gesamt);
         pushBsSimWarnungen(warnungen, bsSim);
 
         const initialCombinedRateBS = computeInitialCombinedRateBS(bsDarlehen, p, bsSim);
@@ -752,7 +751,7 @@ function computeModel(p) {
         // sondergetilgt; die Anschlussfinanzierung startet sofort bei T_zb.
         const fvEigenAtZB = (r_e > 0) ? R * ((Math.pow(1 + r_e, zinsbindungMonate) - 1) / r_e) : (R * zinsbindungMonate);
         const eigenBankLoan = Math.max(0, restschuldZB - fvEigenAtZB);
-        const targetEigenRate = computeTargetEigenRate(initialCombinedRateBS, eigenBankLoan, p);
+        const targetEigenRate = pmt_anspar_gesamt;
         const eigenGapDetails = runBankLoanDetailsByPmt(eigenBankLoan, p.bankBauzins, targetEigenRate);
         if (eigenGapDetails.angehoben) warnungen.push(`Budget-Parität verletzt: Die Rate des Eigenanlage-Bankkredits musste von ${formatEUR(targetEigenRate)} auf ${formatEUR(eigenGapDetails.pmt)} angehoben werden.`);
         pushEigenGapWarnung(warnungen, eigenGapDetails);
