@@ -747,24 +747,23 @@ function computeModel(p) {
 
         const initialCombinedRateBS = computeInitialCombinedRateBS(bsDarlehen, p, bsSim);
 
-        const sondertilgungEigen = Math.min(fvEigenAtZuteilung, sondertilgungMax);
-        const restBetragEigen = Math.max(0, fvEigenAtZuteilung - sondertilgungEigen);
-        const step1EigenWeiter = runLoanWithLumpSumAtStart(restschuldAtZ, p.initZins, pmt_init, zParkMonate, sondertilgungEigen);
-        const restFV_Eigen = restBetragEigen * Math.pow(1 + r_e, zParkMonate);
-        const restschuldZBEigen = step1EigenWeiter.restschuld;
-        const eigenBankLoan = Math.max(0, restschuldZBEigen - restFV_Eigen);
+        // Eigenanlage-Pfad analog Fall A: keine Zwischenpark-Logik.
+        // Es wird bis zum Zinsbindungsende durchgespart und dann direkt
+        // sondergetilgt; die Anschlussfinanzierung startet sofort bei T_zb.
+        const fvEigenAtZB = (r_e > 0) ? R * ((Math.pow(1 + r_e, zinsbindungMonate) - 1) / r_e) : (R * zinsbindungMonate);
+        const eigenBankLoan = Math.max(0, restschuldZB - fvEigenAtZB);
         const targetEigenRate = computeTargetEigenRate(initialCombinedRateBS, eigenBankLoan, p);
         const eigenGapDetails = runBankLoanDetailsByPmt(eigenBankLoan, p.bankBauzins, targetEigenRate);
         if (eigenGapDetails.angehoben) warnungen.push(`Budget-Parität verletzt: Die Rate des Eigenanlage-Bankkredits musste von ${formatEUR(targetEigenRate)} auf ${formatEUR(eigenGapDetails.pmt)} angehoben werden.`);
         pushEigenGapWarnung(warnungen, eigenGapDetails);
 
         const step1BSPaid = step1BSWeiter.schedule.reduce((s, r) => s + r.pmt, 0);
-        const step1EigenPaid = step1EigenWeiter.schedule.reduce((s, r) => s + r.pmt, 0);
+        const totalSparEinzahlungenEigen = R * zinsbindungMonate;
 
         const totalOutlayBS = pmt_init * zuteilungMonate + step1BSPaid + totalSparEinzahlungenBS
                              + bsDarlehen + bsSim.bsZinsenTotal + bsSim.bsRestschuld
                              + bsGapLoan + bsSim.gapZinsenTotal + bsSim.gapRestschuld;
-        const totalOutlayEigen = pmt_init * zuteilungMonate + step1EigenPaid + totalSparEinzahlungenBS
+        const totalOutlayEigen = pmt_init * zinsbindungMonate + totalSparEinzahlungenEigen
                                 + eigenBankLoan + eigenGapDetails.zinsen + eigenGapDetails.restschuld;
 
         const gesamtMonateBS = zinsbindungMonate + Math.max(bsSim.bsMonate, bsSim.gapMonate);
@@ -777,20 +776,18 @@ function computeModel(p) {
             { start: zinsbindungMonate, schedule: bsSim.gapSchedule }
         ];
         const npvPhasesEigen = [
-            { start: 0, pmt: pmt_anspar_gesamt, months: zuteilungMonate },
-            { start: zuteilungMonate, schedule: step1EigenWeiter.schedule },
+            { start: 0, pmt: pmt_anspar_gesamt, months: zinsbindungMonate },
             { start: zinsbindungMonate, schedule: eigenGapDetails.schedule }
         ];
 
         Object.assign(result, {
             calculatedRestschuld: restschuldZBBs, bsGapLoan, bsSim, initialCombinedRateBS, eigenBankLoan, eigenGapDetails,
             totalOutlayBS, totalOutlayEigen, gesamtMonateBS, gesamtMonateEigen, npvPhasesBS, npvPhasesEigen,
-            initialPaidInPeriod: pmt_init * zuteilungMonate + step1BSPaid, totalSparEinzahlungenEigen: totalSparEinzahlungenBS,
-            fvEigenFinal: fvEigenAtZuteilung, eigenSparMonate: zuteilungMonate,
+            initialPaidInPeriod: pmt_init * zuteilungMonate + step1BSPaid, totalSparEinzahlungenEigen,
+            fvEigenFinal: fvEigenAtZB, eigenSparMonate: zinsbindungMonate,
             zwischen: null,
             park: {
                 parkBetragBS, parkFV_BS, sondertilgungBS, sondertilgungMax, zParkMonate,
-                parkBetragEigen: restBetragEigen, parkFV_Eigen: restFV_Eigen, sondertilgungEigen,
                 schedule: generateParkSchedule(parkBetragBS, p.parkZins, zParkMonate)
             }
         });
@@ -1095,7 +1092,7 @@ function calculate() {
     document.getElementById('tblGapBS').innerText = formatEUR(bsGapLoan);
     document.getElementById('tblGapEigen').innerText = formatEUR(eigenBankLoan);
 
-    // ---------- Zwischenfinanzierung (Fall A, nur BS-Pfad) / Zwischenparken (Fall C, beide Pfade) ----------
+    // ---------- Zwischenfinanzierung (Fall A, nur BS-Pfad) / Zwischenparken (Fall C, nur BS-Pfad) ----------
     const trZwischenPark = document.getElementById('trZwischenPark');
     if (model.fall === 'A') {
         trZwischenPark.classList.remove('hidden');
@@ -1107,11 +1104,10 @@ function calculate() {
         document.getElementById('tblZwischenParkEigen').innerText = "– (nicht nötig)";
     } else if (model.fall === 'C') {
         trZwischenPark.classList.remove('hidden');
-        document.getElementById('tblZwischenParkLabel').innerText = `Zwischenparken, Endwert (${formatDuration(model.park.zParkMonate)})`;
+        document.getElementById('tblZwischenParkLabel').innerText = `Zwischenparken (nur BS), Endwert (${formatDuration(model.park.zParkMonate)})`;
         document.getElementById('tblZwischenParkBS').innerText = model.park.parkBetragBS > 0.001
             ? formatEUR(model.park.parkFV_BS) : "– (vollständig sondergetilgt)";
-        document.getElementById('tblZwischenParkEigen').innerText = model.park.parkBetragEigen > 0.001
-            ? formatEUR(model.park.parkFV_Eigen) : "– (vollständig sondergetilgt)";
+        document.getElementById('tblZwischenParkEigen').innerText = "– (nicht nötig)";
     } else {
         trZwischenPark.classList.add('hidden');
     }
