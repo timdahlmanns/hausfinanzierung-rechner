@@ -645,35 +645,6 @@ function splitTerminalMonth(monthlyTotals) {
     if (!Array.isArray(monthlyTotals) || monthlyTotals.length === 0) {
         return { core: [], terminal: null };
     }
-
-    function renderTopConfigsTable(configs) {
-        if (!Array.isArray(configs) || configs.length === 0) return "";
-        const rows = configs.map((c, idx) => `
-            <tr class="border-b border-red-100 last:border-b-0">
-                <td class="py-1.5 px-2 text-right font-semibold">${idx + 1}</td>
-                <td class="py-1.5 px-2 text-right">${(c.initTilgung * 100).toFixed(2)} %</td>
-                <td class="py-1.5 px-2 text-right">${c.bsZuteilungJahre.toFixed(2)}</td>
-                <td class="py-1.5 px-2 text-right">${(c.bankTilgung * 100).toFixed(2)} %</td>
-                <td class="py-1.5 px-2 text-right font-bold">${formatEUR(c.totalOutlayBS)}</td>
-            </tr>
-        `).join("");
-        return `
-            <div class="overflow-x-auto">
-                <table class="w-full text-[11px] text-red-900 border border-red-100 rounded-lg overflow-hidden">
-                    <thead class="bg-red-100/70">
-                        <tr>
-                            <th class="py-1.5 px-2 text-right w-10">#</th>
-                            <th class="py-1.5 px-2 text-right">Init.-Tilgung</th>
-                            <th class="py-1.5 px-2 text-right">BS-Zuteilung (J.)</th>
-                            <th class="py-1.5 px-2 text-right">Bank-Tilgung</th>
-                            <th class="py-1.5 px-2 text-right">Gesamtsumme</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rows}</tbody>
-                </table>
-            </div>
-        `;
-    }
     if (monthlyTotals.length === 1) {
         return { core: monthlyTotals.slice(), terminal: monthlyTotals[0] };
     }
@@ -681,6 +652,35 @@ function splitTerminalMonth(monthlyTotals) {
         core: monthlyTotals.slice(0, -1),
         terminal: monthlyTotals[monthlyTotals.length - 1]
     };
+}
+
+function renderTopConfigsTable(configs) {
+    if (!Array.isArray(configs) || configs.length === 0) return "";
+    const rows = configs.map((c, idx) => `
+        <tr class="border-b border-red-100 last:border-b-0">
+            <td class="py-1.5 px-2 text-right font-semibold">${idx + 1}</td>
+            <td class="py-1.5 px-2 text-right">${(c.initTilgung * 100).toFixed(2)} %</td>
+            <td class="py-1.5 px-2 text-right">${c.bsZuteilungJahre.toFixed(2)}</td>
+            <td class="py-1.5 px-2 text-right">${(c.bankTilgung * 100).toFixed(2)} %</td>
+            <td class="py-1.5 px-2 text-right font-bold">${formatEUR(c.totalOutlayBS)}</td>
+        </tr>
+    `).join("");
+    return `
+        <div class="overflow-x-auto">
+            <table class="w-full text-[11px] text-red-900 border border-red-100 rounded-lg overflow-hidden">
+                <thead class="bg-red-100/70">
+                    <tr>
+                        <th class="py-1.5 px-2 text-right w-10">#</th>
+                        <th class="py-1.5 px-2 text-right">Init.-Tilgung</th>
+                        <th class="py-1.5 px-2 text-right">BS-Zuteilung (J.)</th>
+                        <th class="py-1.5 px-2 text-right">Bank-Tilgung</th>
+                        <th class="py-1.5 px-2 text-right">Gesamtsumme</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `;
 }
 
 function deriveInitTilgungForTargetRate(p, zuteilungJahre, targetRate) {
