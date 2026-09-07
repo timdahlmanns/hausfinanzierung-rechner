@@ -622,19 +622,6 @@ function computeTargetMonthlyRateFit(monthlyTotals, targetRate) {
     if (!(Number.isFinite(targetRate) && targetRate > 0) || monthlyTotals.length === 0) {
         return { score: Number.POSITIVE_INFINITY, meanAbsDev: Number.POSITIVE_INFINITY, maxDev: Number.POSITIVE_INFINITY, peakPayment: Number.POSITIVE_INFINITY };
     }
-
-    function splitTerminalMonth(monthlyTotals) {
-        if (!Array.isArray(monthlyTotals) || monthlyTotals.length === 0) {
-            return { core: [], terminal: null };
-        }
-        if (monthlyTotals.length === 1) {
-            return { core: monthlyTotals.slice(), terminal: monthlyTotals[0] };
-        }
-        return {
-            core: monthlyTotals.slice(0, -1),
-            terminal: monthlyTotals[monthlyTotals.length - 1]
-        };
-    }
     let absDevSum = 0;
     let maxDev = 0;
     let peakPayment = 0;
@@ -646,6 +633,19 @@ function computeTargetMonthlyRateFit(monthlyTotals, targetRate) {
     }
     const meanAbsDev = absDevSum / monthlyTotals.length;
     return { score: meanAbsDev + (0.35 * maxDev), meanAbsDev, maxDev, peakPayment };
+}
+
+function splitTerminalMonth(monthlyTotals) {
+    if (!Array.isArray(monthlyTotals) || monthlyTotals.length === 0) {
+        return { core: [], terminal: null };
+    }
+    if (monthlyTotals.length === 1) {
+        return { core: monthlyTotals.slice(), terminal: monthlyTotals[0] };
+    }
+    return {
+        core: monthlyTotals.slice(0, -1),
+        terminal: monthlyTotals[monthlyTotals.length - 1]
+    };
 }
 
 function deriveInitTilgungForTargetRate(p, zuteilungJahre, targetRate) {
