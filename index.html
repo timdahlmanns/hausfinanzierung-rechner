@@ -618,17 +618,21 @@ function buildMonthlyTotalsFromPhases(phases) {
     return totals.filter((v, i) => i > 0 && Number.isFinite(v));
 }
 
-function scoreTargetMonthlyRate(monthlyTotals, targetRate) {
-    if (!(Number.isFinite(targetRate) && targetRate > 0) || monthlyTotals.length === 0) return Number.POSITIVE_INFINITY;
+function computeTargetMonthlyRateFit(monthlyTotals, targetRate) {
+    if (!(Number.isFinite(targetRate) && targetRate > 0) || monthlyTotals.length === 0) {
+        return { score: Number.POSITIVE_INFINITY, meanAbsDev: Number.POSITIVE_INFINITY, maxDev: Number.POSITIVE_INFINITY, peakPayment: Number.POSITIVE_INFINITY };
+    }
     let absDevSum = 0;
     let maxDev = 0;
+    let peakPayment = 0;
     for (const payment of monthlyTotals) {
         const dev = Math.abs(payment - targetRate);
         absDevSum += dev;
         if (dev > maxDev) maxDev = dev;
+        if (payment > peakPayment) peakPayment = payment;
     }
     const meanAbsDev = absDevSum / monthlyTotals.length;
-    return meanAbsDev + (0.35 * maxDev);
+    return { score: meanAbsDev + (0.35 * maxDev), meanAbsDev, maxDev, peakPayment };
 }
 
 function deriveInitTilgungForTargetRate(p, zuteilungJahre, targetRate) {
@@ -662,21 +666,65 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
         };
     }
 
+    const COST_EPS = 5;
+    const ALIGN_EPS = 0.001;
+    const FIT_EPS = 0.01;
+    const MAX_REASONABLE_OUTLAY = 1e10;
+    const MIN_BANK_TILG = 0.005;
+    const MAX_BANK_TILG = 0.12;
+
+    const isFeasibleCandidate = (model, monthlyTotals) => {
+        if (!model || !Number.isFinite(model.totalOutlayBS) || model.totalOutlayBS <= 0 || model.totalOutlayBS > MAX_REASONABLE_OUTLAY) return false;
+        if (!Array.isArray(monthlyTotals) || monthlyTotals.length === 0) return false;
+        if (monthlyTotals.some(v => !Number.isFinite(v) || v < 0 || v > 1e8)) return false;
+        if (model.bsSim && (model.bsSim.fehler || model.bsSim.bsRestschuld > 1 || model.bsSim.gapRestschuld > 1)) return false;
+        if (model.eigenGapDetails && model.eigenGapDetails.restschuld > 1) return false;
+        return true;
+    };
+
+    const compareLexicographic = (a, b) => {
+        if (!b) return true;
+        if (a.totalOutlayBS < b.totalOutlayBS - COST_EPS) return true;
+        if (Math.abs(a.totalOutlayBS - b.totalOutlayBS) <= COST_EPS) {
+            if (a.alignmentGap < b.alignmentGap - ALIGN_EPS) return true;
+            if (Math.abs(a.alignmentGap - b.alignmentGap) <= ALIGN_EPS) {
+                if (a.fitScore < b.fitScore - FIT_EPS) return true;
+                if (Math.abs(a.fitScore - b.fitScore) <= FIT_EPS) {
+                    if (a.runtimeMonths < b.runtimeMonths) return true;
+                    if (a.runtimeMonths === b.runtimeMonths && a.peakPayment < b.peakPayment) return true;
+                }
+            }
+        }
+        return false;
+    };
+
     const evaluateCandidate = (zuteilungJahre, bankTilgung) => {
         const initTilgung = deriveInitTilgungForTargetRate(baseParams, zuteilungJahre, targetRate);
         const candidate = Object.assign({}, baseParams, { bsZuteilungJahre: zuteilungJahre, initTilgung, bankTilgung });
         const model = computeModel(candidate);
         const monthlyTotals = buildMonthlyTotalsFromPhases(model.npvPhasesBS || []);
-        const score = scoreTargetMonthlyRate(monthlyTotals, targetRate);
-        return { candidate, monthlyTotals, score };
+        const fit = computeTargetMonthlyRateFit(monthlyTotals, targetRate);
+        if (!isFeasibleCandidate(model, monthlyTotals)) return null;
+        return {
+            candidate,
+            monthlyTotals,
+            model,
+            totalOutlayBS: model.totalOutlayBS,
+            alignmentGap: Math.abs(baseParams.zinsbindungJahre - zuteilungJahre),
+            fitScore: fit.score,
+            meanAbsDev: fit.meanAbsDev,
+            maxDev: fit.maxDev,
+            peakPayment: fit.peakPayment,
+            runtimeMonths: model.gesamtMonateBS
+        };
     };
 
     let best = null;
-    for (let zuteilungJahre = 1; zuteilungJahre <= 50; zuteilungJahre++) {
-        for (let bankTilgung = 0.005; bankTilgung <= 0.1200001; bankTilgung += 0.005) {
+    for (let zuteilungJahre = 1; zuteilungJahre <= 50; zuteilungJahre += 1) {
+        for (let bankTilgung = MIN_BANK_TILG; bankTilgung <= MAX_BANK_TILG + 1e-12; bankTilgung += 0.005) {
             const attempt = evaluateCandidate(zuteilungJahre, bankTilgung);
-            if (!Number.isFinite(attempt.score)) continue;
-            if (!best || attempt.score < best.score) best = attempt;
+            if (!attempt) continue;
+            if (compareLexicographic(attempt, best)) best = attempt;
         }
     }
 
@@ -690,22 +738,20 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
 
     const bestZ = best.candidate.bsZuteilungJahre;
     const bestTilg = best.candidate.bankTilgung;
-    for (let zuteilungJahre = Math.max(1, bestZ - 2); zuteilungJahre <= Math.min(50, bestZ + 2); zuteilungJahre++) {
-        for (let bankTilgung = Math.max(0.005, bestTilg - 0.01); bankTilgung <= Math.min(0.12, bestTilg + 0.01) + 1e-12; bankTilgung += 0.001) {
+    for (let zuteilungJahre = Math.max(1, bestZ - 2); zuteilungJahre <= Math.min(50, bestZ + 2) + 1e-12; zuteilungJahre += 0.25) {
+        for (let bankTilgung = Math.max(MIN_BANK_TILG, bestTilg - 0.01); bankTilgung <= Math.min(MAX_BANK_TILG, bestTilg + 0.01) + 1e-12; bankTilgung += 0.001) {
             const attempt = evaluateCandidate(zuteilungJahre, bankTilgung);
-            if (!Number.isFinite(attempt.score)) continue;
-            if (attempt.score < best.score) best = attempt;
+            if (!attempt) continue;
+            if (compareLexicographic(attempt, best)) best = attempt;
         }
     }
 
-    const count = best.monthlyTotals.length || 1;
-    const avgRate = best.monthlyTotals.reduce((s, v) => s + v, 0) / count;
-    const maxDev = best.monthlyTotals.reduce((m, v) => Math.max(m, Math.abs(v - targetRate)), 0);
+    const avgRate = best.monthlyTotals.reduce((s, v) => s + v, 0) / (best.monthlyTotals.length || 1);
     const warnungen = [
-        `Ziel-Monatsrate aktiv: init. Tilgung auf ${(best.candidate.initTilgung * 100).toFixed(2)} %, BS-Zuteilung auf ${best.candidate.bsZuteilungJahre} Jahre und Bank-Tilgung auf ${(best.candidate.bankTilgung * 100).toFixed(2)} % kalibriert.`
+        `Ziel-Monatsrate aktiv (lexikografisch): Primär wurden die Gesamtkosten minimiert, danach |Zinsbindung−Zuteilung| und zuletzt die Ratenabweichung. Ergebnis: init. Tilgung ${(best.candidate.initTilgung * 100).toFixed(2)} %, BS-Zuteilung ${best.candidate.bsZuteilungJahre.toFixed(2)} Jahre, Bank-Tilgung ${(best.candidate.bankTilgung * 100).toFixed(2)} %.`
     ];
-    if (maxDev > targetRate * 0.08) {
-        warnungen.push(`Die Zielrate ${formatEUR(targetRate)} kann nicht in allen Phasen exakt gehalten werden (max. Abweichung: ${formatEUR(maxDev)}, Ø: ${formatEUR(avgRate)}).`);
+    if (best.maxDev > targetRate * 0.08) {
+        warnungen.push(`Die Zielrate ${formatEUR(targetRate)} kann nicht in allen Phasen exakt gehalten werden (max. Abweichung: ${formatEUR(best.maxDev)}, Ø: ${formatEUR(avgRate)}).`);
     }
 
     return {
