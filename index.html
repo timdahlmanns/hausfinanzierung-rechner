@@ -25,6 +25,12 @@
   <div id="warnBanner" class="hidden bg-red-50 border border-red-200 text-red-800 rounded-2xl p-4 text-sm">
     <p class="font-bold mb-1">⚠️ Hinweise zur Berechnung</p>
     <ul id="warnList" class="list-disc list-inside space-y-1 text-xs"></ul>
+    <div id="warnTopConfigsWrap" class="hidden mt-3">
+      <details class="bg-white/70 border border-red-200 rounded-xl p-3">
+        <summary class="cursor-pointer text-xs font-semibold text-red-700">Top 10 Konfigurationen (optimierte Werte)</summary>
+        <div id="warnTopConfigsTable" class="mt-2"></div>
+      </details>
+    </div>
   </div>
 
   <!-- KPI Karten -->
@@ -71,6 +77,7 @@
       <div><label class="text-xs font-medium text-slate-600">Sollzins p.a. (%)</label><input type="number" id="initZins" value="3.80" step="0.05" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
       <div><label class="text-xs font-medium text-slate-600">Anfängliche Tilgung (%)</label><input type="number" id="initTilgung" value="2.00" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
       <div><label class="text-xs font-medium text-slate-600">Zinsbindung Erstkredit (Jahre)</label><input type="number" id="zinsbindungJahre" value="10" step="1" min="1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
+      <div class="mt-1 pt-3 border-t border-slate-200"><label class="text-xs font-medium text-slate-600">Optionale Ziel-Monatsrate (€)</label><input type="number" id="targetMonatsrate" value="" step="25" min="0" placeholder="z. B. 2500" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"><p class="text-[10px] text-slate-400 mt-1">Bei Eingabe werden Tilgungen und BS-Zuteilung automatisch kalibriert; zulässige Bandbreite der Monatslast: Zielrate ± 50 €.</p></div>
     </div>
 
     <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
@@ -94,8 +101,8 @@
       <div><label class="text-xs font-medium text-slate-600">Erwarteter Bankzins bei Anschluss (%)</label><input type="number" id="bankBauzins" value="3.5" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
       <div><label class="text-xs font-medium text-slate-600">Mindest-Tilgung BS-Banklücke (%)</label><input type="number" id="bankTilgung" value="2.0" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
       <div class="grid grid-cols-2 gap-2">
-        <div><label class="text-xs font-medium text-slate-600">Sondertilgung (% p.a.)</label><input type="number" id="sondertilgungPct" value="5" step="1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
-        <div><label class="text-xs font-medium text-slate-600">Zwischenzins (%)</label><input type="number" id="zwischenZins" value="3.5" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
+        <div><label class="text-xs font-medium text-slate-600 min-h-[2.25rem] flex items-end">Sondertilgung (% p.a.)</label><input type="number" id="sondertilgungPct" value="5" step="1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
+        <div><label class="text-xs font-medium text-slate-600 min-h-[2.25rem] flex items-end">Zwischenzins (%)</label><input type="number" id="zwischenZins" value="3.5" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
       </div>
       <div><label class="text-xs font-medium text-slate-600">Anlagezins geparktes Guthaben (%)</label><input type="number" id="parkZins" value="2.0" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"></div>
       <!-- NEU -->
@@ -353,6 +360,50 @@ function formatDuration(months) {
     return `${yrs} J. ${m} M.`;
 }
 
+const INPUT_HELP_TEXTS = {
+    initSumme: "Auszahlungsbetrag des Erstkredits zu Beginn der Finanzierung.",
+    initZins: "Nominalzins des Erstkredits pro Jahr während der Zinsbindung.",
+    initTilgung: "Anfänglicher jährlicher Tilgungssatz des Erstkredits.",
+    targetMonatsrate: "Optionales Ziel für die monatliche Gesamtbelastung; die Kalibrierung akzeptiert nur Verläufe innerhalb Zielrate ± 50 €.",
+    zinsbindungJahre: "Dauer, für die der Sollzins des Erstkredits festgeschrieben ist.",
+    bsSumme: "Vertraglich vereinbarte Bausparsumme aus Guthaben plus möglichem Bauspardarlehen.",
+    bsZuteilungJahre: "Geplanter Zeitpunkt der Bauspar-Zuteilung in Jahren.",
+    bsFeePct: "Abschlussgebühr in Prozent der Bausparsumme.",
+    bsMinPct: "Mindestansparquote bis zur Zuteilung in Prozent der Bausparsumme.",
+    bsGuthabenZins: "Verzinsung des Bausparguthabens pro Jahr.",
+    bsSollzins: "Sollzins des Bauspardarlehens pro Jahr.",
+    bsRateDarlehen: "Monatliche Rate für das Bauspardarlehen nach Zuteilung.",
+    eigenRendite: "Erwartete jährliche Netto-Rendite der alternativen Eigenanlage.",
+    bankBauzins: "Erwarteter Sollzins des Bank-Anschlusskredits pro Jahr.",
+    bankTilgung: "Jährlicher Tilgungssatz für Bank-Anschluss- bzw. Lückenkredite.",
+    sondertilgungPct: "Maximal mögliche Sondertilgung pro Jahr in Prozent der Ursprungssumme.",
+    zwischenZins: "Sollzins des Zwischendarlehens pro Jahr (relevant in Fall A).",
+    parkZins: "Verzinsung für nicht sondertilgbares, zwischengeparktes Guthaben.",
+    diskontZins: "Diskontsatz für den laufzeitbereinigten Barwertvergleich (NPV)."
+};
+
+function decorateInputLabelsWithInfo() {
+    Object.entries(INPUT_HELP_TEXTS).forEach(([id, helpText]) => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        const wrapper = input.parentElement;
+        if (!wrapper) return;
+        const label = wrapper.querySelector('label');
+        if (!label || label.dataset.infoDecorated === "1") return;
+
+        label.classList.add('flex', 'items-center', 'gap-1');
+        const icon = document.createElement('span');
+        icon.className = 'inline-flex items-center justify-center w-4 h-4 rounded-full border border-slate-300 text-[10px] leading-none text-slate-500 cursor-help select-none';
+        icon.textContent = "i";
+        icon.title = helpText;
+        icon.setAttribute('aria-label', helpText);
+        label.appendChild(icon);
+        label.dataset.infoDecorated = "1";
+
+        if (!input.title) input.title = helpText;
+    });
+}
+
 /* Läuft exakt `months` Monate lang mit fixer Rate `pmt` (kein Abbruch bei
    Volltilgung, kein Deckel bei Negativtilgung – bewusst begrenzt durch
    `months`, damit auch eine zu geringe Zwischendarlehensrate keine
@@ -552,6 +603,292 @@ function computeNPV(phases, d_m) {
         }
     });
     return npv;
+}
+
+function buildMonthlyTotalsFromPhases(phases) {
+    const totals = [];
+    phases.forEach(ph => {
+        if (!ph) return;
+        if (ph.pmt !== undefined && Number.isFinite(ph.months)) {
+            for (let m = 1; m <= ph.months; m++) {
+                const absMonth = ph.start + m;
+                totals[absMonth] = (totals[absMonth] || 0) + ph.pmt;
+            }
+        } else if (ph.schedule) {
+            ph.schedule.forEach(row => {
+                const absMonth = ph.start + row.m;
+                totals[absMonth] = (totals[absMonth] || 0) + row.pmt;
+            });
+        }
+    });
+    return totals.filter((v, i) => i > 0 && Number.isFinite(v));
+}
+
+function computeTargetMonthlyRateFit(monthlyTotals, targetRate) {
+    if (!(Number.isFinite(targetRate) && targetRate > 0) || monthlyTotals.length === 0) {
+        return { score: Number.POSITIVE_INFINITY, meanAbsDev: Number.POSITIVE_INFINITY, maxDev: Number.POSITIVE_INFINITY, peakPayment: Number.POSITIVE_INFINITY };
+    }
+    let absDevSum = 0;
+    let maxDev = 0;
+    let peakPayment = 0;
+    for (const payment of monthlyTotals) {
+        const dev = Math.abs(payment - targetRate);
+        absDevSum += dev;
+        if (dev > maxDev) maxDev = dev;
+        if (payment > peakPayment) peakPayment = payment;
+    }
+    const meanAbsDev = absDevSum / monthlyTotals.length;
+    return { score: meanAbsDev + (0.35 * maxDev), meanAbsDev, maxDev, peakPayment };
+}
+
+function splitTerminalMonth(monthlyTotals) {
+    if (!Array.isArray(monthlyTotals) || monthlyTotals.length === 0) {
+        return { core: [], terminal: null };
+    }
+    if (monthlyTotals.length === 1) {
+        return { core: monthlyTotals.slice(), terminal: monthlyTotals[0] };
+    }
+    return {
+        core: monthlyTotals.slice(0, -1),
+        terminal: monthlyTotals[monthlyTotals.length - 1]
+    };
+}
+
+function renderTopConfigsTable(configs) {
+    if (!Array.isArray(configs) || configs.length === 0) return "";
+    const rows = configs.map((c, idx) => `
+        <tr class="border-b border-red-100 last:border-b-0">
+            <td class="py-1.5 px-2 text-right font-semibold">${idx + 1}</td>
+            <td class="py-1.5 px-2 text-right font-semibold">${c.pathLabel}</td>
+            <td class="py-1.5 px-2 text-right">${(c.initTilgung * 100).toFixed(2)} %</td>
+            <td class="py-1.5 px-2 text-right">${c.bsZuteilungJahre.toFixed(2)}</td>
+            <td class="py-1.5 px-2 text-right">${(c.bankTilgung * 100).toFixed(2)} %</td>
+            <td class="py-1.5 px-2 text-right font-bold">${formatEUR(c.rankedOutlay)}</td>
+            <td class="py-1.5 px-2 text-right font-bold">${formatEUR(c.totalOutlayBS)}</td>
+            <td class="py-1.5 px-2 text-right font-bold">${formatEUR(c.totalOutlayEigen)}</td>
+        </tr>
+    `).join("");
+    return `
+        <div class="overflow-x-auto">
+            <table class="w-full text-[11px] text-red-900 border border-red-100 rounded-lg overflow-hidden">
+                <thead class="bg-red-100/70">
+                    <tr>
+                        <th class="py-1.5 px-2 text-right w-10">#</th>
+                        <th class="py-1.5 px-2 text-right">Pfad</th>
+                        <th class="py-1.5 px-2 text-right">Init.-Tilgung</th>
+                        <th class="py-1.5 px-2 text-right">BS-Zuteilung (J.)</th>
+                        <th class="py-1.5 px-2 text-right">Bank-Tilgung</th>
+                        <th class="py-1.5 px-2 text-right">Gesamtsumme (Rang)</th>
+                        <th class="py-1.5 px-2 text-right">Gesamt mit BS</th>
+                        <th class="py-1.5 px-2 text-right">Gesamt ohne BS</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `;
+}
+
+function deriveInitTilgungForTargetRate(p, zuteilungJahre, targetRate) {
+    if (!(p.initSumme > 0)) return 0.001;
+    const zMonate = Math.max(1, Math.round(zuteilungJahre * 12));
+    const fee = p.bsSumme * p.bsFeePct;
+    const targetGuthaben = p.bsSumme * p.bsMinPct;
+    const r_bs_anspar = p.bsGuthabenZins / 12;
+    let factor_bs = zMonate;
+    if (r_bs_anspar > 0) factor_bs = (Math.pow(1 + r_bs_anspar, zMonate) - 1) / r_bs_anspar;
+    const fv_fee = fee * Math.pow(1 + r_bs_anspar, zMonate);
+    const R = factor_bs > 0 ? (targetGuthaben + fv_fee) / factor_bs : 0;
+
+    const minInitRate = p.initSumme * (p.initZins + 0.005) / 12;
+    const desiredInitRate = targetRate - R;
+    const safeInitRate = Math.max(minInitRate, desiredInitRate);
+    const initTilgung = (safeInitRate * 12 / p.initSumme) - p.initZins;
+    return Math.max(0.001, Math.min(0.20, initTilgung));
+}
+
+function calibrateParamsForTargetMonthlyRate(baseParams) {
+    const targetRate = baseParams.targetMonatsrate;
+    if (!(Number.isFinite(targetRate) && targetRate > 0)) {
+        return { params: baseParams, applied: false, warnungen: [] };
+    }
+    if (!(baseParams.initSumme > 0)) {
+        return {
+            params: baseParams,
+            applied: false,
+            warnungen: ["Ziel-Monatsrate aktiv, aber Kreditsumme ist 0 € – automatische Kalibrierung wurde übersprungen."]
+        };
+    }
+
+    const COST_EPS = 5;
+    const ALIGN_EPS = 0.001;
+    const FIT_EPS = 0.01;
+    const MAX_REASONABLE_OUTLAY = 1e10;
+    const MIN_BANK_TILG = 0.005;
+    const MAX_BANK_TILG = 0.12;
+    const RATE_BAND_EUR = 50;
+    const minAllowedRate = Math.max(0, targetRate - RATE_BAND_EUR);
+    const maxAllowedRate = targetRate + RATE_BAND_EUR;
+
+    const isFeasibleCandidate = (model, monthlyTotals) => {
+        if (!model || !Number.isFinite(model.totalOutlayBS) || model.totalOutlayBS <= 0 || model.totalOutlayBS > MAX_REASONABLE_OUTLAY) return false;
+        if (!Number.isFinite(model.totalOutlayEigen) || model.totalOutlayEigen <= 0 || model.totalOutlayEigen > MAX_REASONABLE_OUTLAY) return false;
+        if (!Array.isArray(monthlyTotals) || monthlyTotals.length === 0) return false;
+        if (monthlyTotals.some(v => !Number.isFinite(v) || v < 0 || v > 1e8)) return false;
+        const coreMonths = splitTerminalMonth(monthlyTotals).core;
+        if (coreMonths.length > 0 && coreMonths.some(v => v < minAllowedRate || v > maxAllowedRate)) return false;
+        if (model.bsSim && (model.bsSim.fehler || model.bsSim.bsRestschuld > 1 || model.bsSim.gapRestschuld > 1)) return false;
+        if (model.eigenGapDetails && model.eigenGapDetails.restschuld > 1) return false;
+        return true;
+    };
+
+    const compareByPathCost = (a, b, fieldName) => {
+        if (a[fieldName] < b[fieldName] - COST_EPS) return -1;
+        if (b[fieldName] < a[fieldName] - COST_EPS) return 1;
+        if (a.alignmentGap < b.alignmentGap - ALIGN_EPS) return -1;
+        if (b.alignmentGap < a.alignmentGap - ALIGN_EPS) return 1;
+        if (a.fitScore < b.fitScore - FIT_EPS) return -1;
+        if (b.fitScore < a.fitScore - FIT_EPS) return 1;
+        if (a.runtimeMonths !== b.runtimeMonths) return a.runtimeMonths - b.runtimeMonths;
+        return a.peakPayment - b.peakPayment;
+    };
+
+    const evaluateCandidate = (zuteilungJahre, bankTilgung) => {
+        const initTilgung = deriveInitTilgungForTargetRate(baseParams, zuteilungJahre, targetRate);
+        const candidate = Object.assign({}, baseParams, { bsZuteilungJahre: zuteilungJahre, initTilgung, bankTilgung });
+        const model = computeModel(candidate);
+        const monthlyTotals = buildMonthlyTotalsFromPhases(model.npvPhasesBS || []);
+        const fit = computeTargetMonthlyRateFit(monthlyTotals, targetRate);
+        if (!isFeasibleCandidate(model, monthlyTotals)) return null;
+        return {
+            candidate,
+            monthlyTotals,
+            model,
+            totalOutlayBS: model.totalOutlayBS,
+            totalOutlayEigen: model.totalOutlayEigen,
+            alignmentGap: Math.abs(baseParams.zinsbindungJahre - zuteilungJahre),
+            fitScore: fit.score,
+            meanAbsDev: fit.meanAbsDev,
+            maxDev: fit.maxDev,
+            peakPayment: fit.peakPayment,
+            runtimeMonths: model.gesamtMonateBS
+        };
+    };
+
+    const feasibleByKey = new Map();
+    const addFeasibleCandidate = (attempt) => {
+        if (!attempt) return;
+        const key = [
+            attempt.candidate.initTilgung.toFixed(6),
+            attempt.candidate.bsZuteilungJahre.toFixed(4),
+            attempt.candidate.bankTilgung.toFixed(6)
+        ].join("|");
+        if (!feasibleByKey.has(key)) feasibleByKey.set(key, attempt);
+    };
+
+    let coarseBestBS = null;
+    let coarseBestEigen = null;
+    for (let zuteilungJahre = 1; zuteilungJahre <= 50; zuteilungJahre += 1) {
+        for (let bankTilgung = MIN_BANK_TILG; bankTilgung <= MAX_BANK_TILG + 1e-12; bankTilgung += 0.005) {
+            const attempt = evaluateCandidate(zuteilungJahre, bankTilgung);
+            addFeasibleCandidate(attempt);
+            if (!attempt) continue;
+            if (!coarseBestBS || compareByPathCost(attempt, coarseBestBS, 'totalOutlayBS') < 0) coarseBestBS = attempt;
+            if (!coarseBestEigen || compareByPathCost(attempt, coarseBestEigen, 'totalOutlayEigen') < 0) coarseBestEigen = attempt;
+        }
+    }
+
+    if (!coarseBestBS && !coarseBestEigen) {
+        return {
+            params: baseParams,
+            applied: false,
+            warnungen: [`Für die angegebene Ziel-Monatsrate konnte keine Lösung innerhalb der harten Bandbreite ${formatEUR(minAllowedRate)} bis ${formatEUR(maxAllowedRate)} gefunden werden.`]
+        };
+    }
+
+    const refineAround = (center) => {
+        if (!center) return;
+        const bestZ = center.candidate.bsZuteilungJahre;
+        const bestTilg = center.candidate.bankTilgung;
+        for (let zuteilungJahre = Math.max(1, bestZ - 2); zuteilungJahre <= Math.min(50, bestZ + 2) + 1e-12; zuteilungJahre += 0.25) {
+            for (let bankTilgung = Math.max(MIN_BANK_TILG, bestTilg - 0.01); bankTilgung <= Math.min(MAX_BANK_TILG, bestTilg + 0.01) + 1e-12; bankTilgung += 0.001) {
+                const attempt = evaluateCandidate(zuteilungJahre, bankTilgung);
+                addFeasibleCandidate(attempt);
+            }
+        }
+    };
+    refineAround(coarseBestBS);
+    refineAround(coarseBestEigen);
+
+    const feasible = Array.from(feasibleByKey.values());
+    const sortByBS = (a, b) => compareByPathCost(a, b, 'totalOutlayBS');
+    const sortByEigen = (a, b) => compareByPathCost(a, b, 'totalOutlayEigen');
+
+    const rankedBS = [...feasible].sort(sortByBS);
+    const rankedEigen = [...feasible].sort(sortByEigen);
+
+    const getKey = (x) => [
+        x.candidate.initTilgung.toFixed(6),
+        x.candidate.bsZuteilungJahre.toFixed(4),
+        x.candidate.bankTilgung.toFixed(6)
+    ].join("|");
+
+    const rankedEntries = [];
+    rankedBS.forEach((x) => rankedEntries.push({
+        key: getKey(x),
+        path: 'BS',
+        pathLabel: 'Mit BS',
+        rankedOutlay: x.totalOutlayBS,
+        attempt: x
+    }));
+    rankedEigen.forEach((x) => rankedEntries.push({
+        key: getKey(x),
+        path: 'EIGEN',
+        pathLabel: 'Ohne BS',
+        rankedOutlay: x.totalOutlayEigen,
+        attempt: x
+    }));
+
+    rankedEntries.sort((a, b) => {
+        if (a.rankedOutlay < b.rankedOutlay - COST_EPS) return -1;
+        if (b.rankedOutlay < a.rankedOutlay - COST_EPS) return 1;
+        if (a.attempt.alignmentGap < b.attempt.alignmentGap - ALIGN_EPS) return -1;
+        if (b.attempt.alignmentGap < a.attempt.alignmentGap - ALIGN_EPS) return 1;
+        if (a.attempt.fitScore < b.attempt.fitScore - FIT_EPS) return -1;
+        if (b.attempt.fitScore < a.attempt.fitScore - FIT_EPS) return 1;
+        if (a.attempt.runtimeMonths !== b.attempt.runtimeMonths) return a.attempt.runtimeMonths - b.attempt.runtimeMonths;
+        return a.attempt.peakPayment - b.attempt.peakPayment;
+    });
+
+    const best = rankedEntries[0] ? rankedEntries[0].attempt : (rankedBS[0] || rankedEigen[0]);
+
+    const avgRate = best.monthlyTotals.reduce((s, v) => s + v, 0) / (best.monthlyTotals.length || 1);
+    const warnungen = [
+        `Ziel-Monatsrate aktiv (harte Bandbreite ${formatEUR(minAllowedRate)} bis ${formatEUR(maxAllowedRate)}): Für den Rang zählen nur die günstigsten Einzel-Gesamtsummen aus beiden Pfaden (mit/ohne BS). Ergebnis: init. Tilgung ${(best.candidate.initTilgung * 100).toFixed(2)} %, BS-Zuteilung ${best.candidate.bsZuteilungJahre.toFixed(2)} Jahre, Bank-Tilgung ${(best.candidate.bankTilgung * 100).toFixed(2)} %.`
+    ];
+    if (best.maxDev > targetRate * 0.08) {
+        warnungen.push(`Die Zielrate ${formatEUR(targetRate)} kann nicht in allen Phasen exakt gehalten werden (max. Abweichung: ${formatEUR(best.maxDev)}, Ø: ${formatEUR(avgRate)}).`);
+    }
+
+    return {
+        params: best.candidate,
+        applied: true,
+        warnungen,
+        topConfigs: rankedEntries
+            .slice(0, 10)
+            .map((entry) => {
+                const x = entry.attempt;
+                return {
+                initTilgung: x.candidate.initTilgung,
+                bsZuteilungJahre: x.candidate.bsZuteilungJahre,
+                bankTilgung: x.candidate.bankTilgung,
+                pathLabel: entry.pathLabel,
+                rankedOutlay: entry.rankedOutlay,
+                totalOutlayBS: x.totalOutlayBS,
+                totalOutlayEigen: x.totalOutlayEigen
+                };
+            })
+    };
 }
 
 /* ============================================================
@@ -964,6 +1301,7 @@ function readInputs(warnungen) {
         initSumme:        parseFloat(document.getElementById('initSumme').value) || 0,
         initZins:        (parseFloat(document.getElementById('initZins').value) || 0) / 100,
         initTilgung:     (parseFloat(document.getElementById('initTilgung').value) || 0) / 100,
+        targetMonatsrate: parseFloat(document.getElementById('targetMonatsrate').value) || 0,
         zinsbindungJahre: parsePositiveYears(document.getElementById('zinsbindungJahre').value, 'Zinsbindung Erstkredit (Jahre)', warnungen),
         bsZuteilungJahre: parsePositiveYears(document.getElementById('bsZuteilungJahre').value, 'BS-Zuteilungszeitpunkt (Jahre)', warnungen),
 
@@ -986,10 +1324,17 @@ function readInputs(warnungen) {
 
 function calculate() {
     const inputWarnungen = [];
-    const p = readInputs(inputWarnungen);
+    const pRaw = readInputs(inputWarnungen);
+    const calibration = calibrateParamsForTargetMonthlyRate(pRaw);
+    const p = calibration.params;
+    if (calibration.applied) {
+        document.getElementById('initTilgung').value = (p.initTilgung * 100).toFixed(2);
+        document.getElementById('bsZuteilungJahre').value = String(p.bsZuteilungJahre);
+        document.getElementById('bankTilgung').value = (p.bankTilgung * 100).toFixed(2);
+    }
     const model = computeModel(p);
     model.p = p;
-    model.warnungen = inputWarnungen.concat(model.warnungen);
+    model.warnungen = inputWarnungen.concat(calibration.warnungen || [], model.warnungen);
 
     const zinsbindungMonate = model.zinsbindungMonate;
     const zuteilungMonate = model.zuteilungMonate;
@@ -1038,6 +1383,15 @@ function calculate() {
     // ---------- UI: Warnungen ----------
     const warnBanner = document.getElementById('warnBanner');
     const warnList = document.getElementById('warnList');
+    const warnTopConfigsWrap = document.getElementById('warnTopConfigsWrap');
+    const warnTopConfigsTable = document.getElementById('warnTopConfigsTable');
+    if (calibration.topConfigs && calibration.topConfigs.length > 0) {
+        warnTopConfigsTable.innerHTML = renderTopConfigsTable(calibration.topConfigs);
+        warnTopConfigsWrap.classList.remove('hidden');
+    } else {
+        warnTopConfigsTable.innerHTML = '';
+        warnTopConfigsWrap.classList.add('hidden');
+    }
     if (model.warnungen.length > 0) {
         warnList.innerHTML = model.warnungen.map(w => `<li>${w}</li>`).join('');
         warnBanner.classList.remove('hidden');
@@ -1249,7 +1603,7 @@ function calculate() {
 }
 
 const inputIds = [
-    'initSumme', 'initZins', 'initTilgung', 'zinsbindungJahre',
+    'initSumme', 'initZins', 'initTilgung', 'targetMonatsrate', 'zinsbindungJahre',
     'bsSumme', 'bsZuteilungJahre', 'bsFeePct', 'bsMinPct', 'bsGuthabenZins', 'bsSollzins', 'bsRateDarlehen',
     'eigenRendite', 'bankBauzins', 'bankTilgung', 'sondertilgungPct', 'zwischenZins', 'parkZins', 'diskontZins'
 ];
@@ -1262,6 +1616,7 @@ function calculateDebounced() {
 }
 inputIds.forEach(id => document.getElementById(id).addEventListener('input', calculateDebounced));
 
+decorateInputLabelsWithInfo();
 calculate();
 
 </script>
