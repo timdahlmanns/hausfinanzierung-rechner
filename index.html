@@ -25,6 +25,12 @@
   <div id="warnBanner" class="hidden bg-red-50 border border-red-200 text-red-800 rounded-2xl p-4 text-sm">
     <p class="font-bold mb-1">⚠️ Hinweise zur Berechnung</p>
     <ul id="warnList" class="list-disc list-inside space-y-1 text-xs"></ul>
+    <div id="warnTopConfigsWrap" class="hidden mt-3">
+      <details class="bg-white/70 border border-red-200 rounded-xl p-3">
+        <summary class="cursor-pointer text-xs font-semibold text-red-700">Top 10 Konfigurationen (optimierte Werte)</summary>
+        <div id="warnTopConfigsTable" class="mt-2"></div>
+      </details>
+    </div>
   </div>
 
   <!-- KPI Karten -->
@@ -639,6 +645,35 @@ function splitTerminalMonth(monthlyTotals) {
     if (!Array.isArray(monthlyTotals) || monthlyTotals.length === 0) {
         return { core: [], terminal: null };
     }
+
+    function renderTopConfigsTable(configs) {
+        if (!Array.isArray(configs) || configs.length === 0) return "";
+        const rows = configs.map((c, idx) => `
+            <tr class="border-b border-red-100 last:border-b-0">
+                <td class="py-1.5 px-2 text-right font-semibold">${idx + 1}</td>
+                <td class="py-1.5 px-2 text-right">${(c.initTilgung * 100).toFixed(2)} %</td>
+                <td class="py-1.5 px-2 text-right">${c.bsZuteilungJahre.toFixed(2)}</td>
+                <td class="py-1.5 px-2 text-right">${(c.bankTilgung * 100).toFixed(2)} %</td>
+                <td class="py-1.5 px-2 text-right font-bold">${formatEUR(c.totalOutlayBS)}</td>
+            </tr>
+        `).join("");
+        return `
+            <div class="overflow-x-auto">
+                <table class="w-full text-[11px] text-red-900 border border-red-100 rounded-lg overflow-hidden">
+                    <thead class="bg-red-100/70">
+                        <tr>
+                            <th class="py-1.5 px-2 text-right w-10">#</th>
+                            <th class="py-1.5 px-2 text-right">Init.-Tilgung</th>
+                            <th class="py-1.5 px-2 text-right">BS-Zuteilung (J.)</th>
+                            <th class="py-1.5 px-2 text-right">Bank-Tilgung</th>
+                            <th class="py-1.5 px-2 text-right">Gesamtsumme</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        `;
+    }
     if (monthlyTotals.length === 1) {
         return { core: monthlyTotals.slice(), terminal: monthlyTotals[0] };
     }
@@ -715,6 +750,16 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
         }
         return false;
     };
+    const sortLexicographic = (a, b) => {
+        if (a.totalOutlayBS < b.totalOutlayBS - COST_EPS) return -1;
+        if (b.totalOutlayBS < a.totalOutlayBS - COST_EPS) return 1;
+        if (a.alignmentGap < b.alignmentGap - ALIGN_EPS) return -1;
+        if (b.alignmentGap < a.alignmentGap - ALIGN_EPS) return 1;
+        if (a.fitScore < b.fitScore - FIT_EPS) return -1;
+        if (b.fitScore < a.fitScore - FIT_EPS) return 1;
+        if (a.runtimeMonths !== b.runtimeMonths) return a.runtimeMonths - b.runtimeMonths;
+        return a.peakPayment - b.peakPayment;
+    };
 
     const evaluateCandidate = (zuteilungJahre, bankTilgung) => {
         const initTilgung = deriveInitTilgungForTargetRate(baseParams, zuteilungJahre, targetRate);
@@ -737,10 +782,22 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
         };
     };
 
+    const feasibleByKey = new Map();
+    const addFeasibleCandidate = (attempt) => {
+        if (!attempt) return;
+        const key = [
+            attempt.candidate.initTilgung.toFixed(6),
+            attempt.candidate.bsZuteilungJahre.toFixed(4),
+            attempt.candidate.bankTilgung.toFixed(6)
+        ].join("|");
+        if (!feasibleByKey.has(key)) feasibleByKey.set(key, attempt);
+    };
+
     let best = null;
     for (let zuteilungJahre = 1; zuteilungJahre <= 50; zuteilungJahre += 1) {
         for (let bankTilgung = MIN_BANK_TILG; bankTilgung <= MAX_BANK_TILG + 1e-12; bankTilgung += 0.005) {
             const attempt = evaluateCandidate(zuteilungJahre, bankTilgung);
+            addFeasibleCandidate(attempt);
             if (!attempt) continue;
             if (compareLexicographic(attempt, best)) best = attempt;
         }
@@ -759,6 +816,7 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
     for (let zuteilungJahre = Math.max(1, bestZ - 2); zuteilungJahre <= Math.min(50, bestZ + 2) + 1e-12; zuteilungJahre += 0.25) {
         for (let bankTilgung = Math.max(MIN_BANK_TILG, bestTilg - 0.01); bankTilgung <= Math.min(MAX_BANK_TILG, bestTilg + 0.01) + 1e-12; bankTilgung += 0.001) {
             const attempt = evaluateCandidate(zuteilungJahre, bankTilgung);
+            addFeasibleCandidate(attempt);
             if (!attempt) continue;
             if (compareLexicographic(attempt, best)) best = attempt;
         }
@@ -775,7 +833,16 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
     return {
         params: best.candidate,
         applied: true,
-        warnungen
+        warnungen,
+        topConfigs: Array.from(feasibleByKey.values())
+            .sort(sortLexicographic)
+            .slice(0, 10)
+            .map(x => ({
+                initTilgung: x.candidate.initTilgung,
+                bsZuteilungJahre: x.candidate.bsZuteilungJahre,
+                bankTilgung: x.candidate.bankTilgung,
+                totalOutlayBS: x.totalOutlayBS
+            }))
     };
 }
 
@@ -1271,6 +1338,15 @@ function calculate() {
     // ---------- UI: Warnungen ----------
     const warnBanner = document.getElementById('warnBanner');
     const warnList = document.getElementById('warnList');
+    const warnTopConfigsWrap = document.getElementById('warnTopConfigsWrap');
+    const warnTopConfigsTable = document.getElementById('warnTopConfigsTable');
+    if (calibration.topConfigs && calibration.topConfigs.length > 0) {
+        warnTopConfigsTable.innerHTML = renderTopConfigsTable(calibration.topConfigs);
+        warnTopConfigsWrap.classList.remove('hidden');
+    } else {
+        warnTopConfigsTable.innerHTML = '';
+        warnTopConfigsWrap.classList.add('hidden');
+    }
     if (model.warnungen.length > 0) {
         warnList.innerHTML = model.warnungen.map(w => `<li>${w}</li>`).join('');
         warnBanner.classList.remove('hidden');
