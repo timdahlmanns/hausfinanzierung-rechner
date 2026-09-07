@@ -663,6 +663,8 @@ function renderTopConfigsTable(configs) {
             <td class="py-1.5 px-2 text-right">${c.bsZuteilungJahre.toFixed(2)}</td>
             <td class="py-1.5 px-2 text-right">${(c.bankTilgung * 100).toFixed(2)} %</td>
             <td class="py-1.5 px-2 text-right font-bold">${formatEUR(c.totalOutlayBS)}</td>
+            <td class="py-1.5 px-2 text-right font-bold">${formatEUR(c.totalOutlayEigen)}</td>
+            <td class="py-1.5 px-2 text-right font-bold">${formatEUR(c.combinedOutlay)}</td>
         </tr>
     `).join("");
     return `
@@ -674,7 +676,9 @@ function renderTopConfigsTable(configs) {
                         <th class="py-1.5 px-2 text-right">Init.-Tilgung</th>
                         <th class="py-1.5 px-2 text-right">BS-Zuteilung (J.)</th>
                         <th class="py-1.5 px-2 text-right">Bank-Tilgung</th>
-                        <th class="py-1.5 px-2 text-right">Gesamtsumme</th>
+                        <th class="py-1.5 px-2 text-right">Gesamt mit BS</th>
+                        <th class="py-1.5 px-2 text-right">Gesamt ohne BS</th>
+                        <th class="py-1.5 px-2 text-right">Summe beider</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
@@ -726,6 +730,7 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
 
     const isFeasibleCandidate = (model, monthlyTotals) => {
         if (!model || !Number.isFinite(model.totalOutlayBS) || model.totalOutlayBS <= 0 || model.totalOutlayBS > MAX_REASONABLE_OUTLAY) return false;
+        if (!Number.isFinite(model.totalOutlayEigen) || model.totalOutlayEigen <= 0 || model.totalOutlayEigen > MAX_REASONABLE_OUTLAY) return false;
         if (!Array.isArray(monthlyTotals) || monthlyTotals.length === 0) return false;
         if (monthlyTotals.some(v => !Number.isFinite(v) || v < 0 || v > 1e8)) return false;
         const coreMonths = splitTerminalMonth(monthlyTotals).core;
@@ -737,22 +742,31 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
 
     const compareLexicographic = (a, b) => {
         if (!b) return true;
-        if (a.totalOutlayBS < b.totalOutlayBS - COST_EPS) return true;
-        if (Math.abs(a.totalOutlayBS - b.totalOutlayBS) <= COST_EPS) {
-            if (a.alignmentGap < b.alignmentGap - ALIGN_EPS) return true;
-            if (Math.abs(a.alignmentGap - b.alignmentGap) <= ALIGN_EPS) {
-                if (a.fitScore < b.fitScore - FIT_EPS) return true;
-                if (Math.abs(a.fitScore - b.fitScore) <= FIT_EPS) {
-                    if (a.runtimeMonths < b.runtimeMonths) return true;
-                    if (a.runtimeMonths === b.runtimeMonths && a.peakPayment < b.peakPayment) return true;
+        if (a.combinedOutlay < b.combinedOutlay - COST_EPS) return true;
+        if (Math.abs(a.combinedOutlay - b.combinedOutlay) <= COST_EPS) {
+            const aWorse = Math.max(a.totalOutlayBS, a.totalOutlayEigen);
+            const bWorse = Math.max(b.totalOutlayBS, b.totalOutlayEigen);
+            if (aWorse < bWorse - COST_EPS) return true;
+            if (Math.abs(aWorse - bWorse) <= COST_EPS) {
+                if (a.alignmentGap < b.alignmentGap - ALIGN_EPS) return true;
+                if (Math.abs(a.alignmentGap - b.alignmentGap) <= ALIGN_EPS) {
+                    if (a.fitScore < b.fitScore - FIT_EPS) return true;
+                    if (Math.abs(a.fitScore - b.fitScore) <= FIT_EPS) {
+                        if (a.runtimeMonths < b.runtimeMonths) return true;
+                        if (a.runtimeMonths === b.runtimeMonths && a.peakPayment < b.peakPayment) return true;
+                    }
                 }
             }
         }
         return false;
     };
     const sortLexicographic = (a, b) => {
-        if (a.totalOutlayBS < b.totalOutlayBS - COST_EPS) return -1;
-        if (b.totalOutlayBS < a.totalOutlayBS - COST_EPS) return 1;
+        if (a.combinedOutlay < b.combinedOutlay - COST_EPS) return -1;
+        if (b.combinedOutlay < a.combinedOutlay - COST_EPS) return 1;
+        const aWorse = Math.max(a.totalOutlayBS, a.totalOutlayEigen);
+        const bWorse = Math.max(b.totalOutlayBS, b.totalOutlayEigen);
+        if (aWorse < bWorse - COST_EPS) return -1;
+        if (bWorse < aWorse - COST_EPS) return 1;
         if (a.alignmentGap < b.alignmentGap - ALIGN_EPS) return -1;
         if (b.alignmentGap < a.alignmentGap - ALIGN_EPS) return 1;
         if (a.fitScore < b.fitScore - FIT_EPS) return -1;
@@ -773,6 +787,8 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
             monthlyTotals,
             model,
             totalOutlayBS: model.totalOutlayBS,
+            totalOutlayEigen: model.totalOutlayEigen,
+            combinedOutlay: model.totalOutlayBS + model.totalOutlayEigen,
             alignmentGap: Math.abs(baseParams.zinsbindungJahre - zuteilungJahre),
             fitScore: fit.score,
             meanAbsDev: fit.meanAbsDev,
@@ -824,7 +840,7 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
 
     const avgRate = best.monthlyTotals.reduce((s, v) => s + v, 0) / (best.monthlyTotals.length || 1);
     const warnungen = [
-        `Ziel-Monatsrate aktiv (lexikografisch, harte Bandbreite ${formatEUR(minAllowedRate)} bis ${formatEUR(maxAllowedRate)}): Primär wurden die Gesamtkosten minimiert, danach |Zinsbindung−Zuteilung| und zuletzt die Ratenabweichung. Ergebnis: init. Tilgung ${(best.candidate.initTilgung * 100).toFixed(2)} %, BS-Zuteilung ${best.candidate.bsZuteilungJahre.toFixed(2)} Jahre, Bank-Tilgung ${(best.candidate.bankTilgung * 100).toFixed(2)} %.`
+        `Ziel-Monatsrate aktiv (lexikografisch, harte Bandbreite ${formatEUR(minAllowedRate)} bis ${formatEUR(maxAllowedRate)}): Primär wurde die kombinierte Gesamtsumme (mit + ohne BS) minimiert, danach der schlechtere der beiden Pfade, dann |Zinsbindung−Zuteilung| und zuletzt die Ratenabweichung. Ergebnis: init. Tilgung ${(best.candidate.initTilgung * 100).toFixed(2)} %, BS-Zuteilung ${best.candidate.bsZuteilungJahre.toFixed(2)} Jahre, Bank-Tilgung ${(best.candidate.bankTilgung * 100).toFixed(2)} %.`
     ];
     if (best.maxDev > targetRate * 0.08) {
         warnungen.push(`Die Zielrate ${formatEUR(targetRate)} kann nicht in allen Phasen exakt gehalten werden (max. Abweichung: ${formatEUR(best.maxDev)}, Ø: ${formatEUR(avgRate)}).`);
@@ -841,7 +857,9 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
                 initTilgung: x.candidate.initTilgung,
                 bsZuteilungJahre: x.candidate.bsZuteilungJahre,
                 bankTilgung: x.candidate.bankTilgung,
-                totalOutlayBS: x.totalOutlayBS
+                totalOutlayBS: x.totalOutlayBS,
+                totalOutlayEigen: x.totalOutlayEigen,
+                combinedOutlay: x.combinedOutlay
             }))
     };
 }
