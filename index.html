@@ -110,6 +110,7 @@
           <tbody>
             <tr class="border-b bg-blue-50/40"><td class="py-1.5 font-bold text-slate-800">Gesamtrate Ansparphase</td><td id="tblAnsparRateBS" class="py-1.5 text-right font-bold text-blue-700">0 €</td><td id="tblAnsparRateEigen" class="py-1.5 text-right font-bold text-blue-700">0 €</td></tr>
             <tr class="border-b"><td class="py-1.5 font-medium">Sparguthaben Akkumuliert</td><td id="tblGuthabenBS" class="py-1.5 text-right font-semibold text-amber-600">0 €</td><td id="tblGuthabenEigen" class="py-1.5 text-right font-semibold text-emerald-600">0 €</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-medium">BS-Abschlussgebühr</td><td id="tblFeeBS" class="py-1.5 text-right font-medium text-amber-700">0 €</td><td class="py-1.5 text-right text-slate-400">–</td></tr>
             <tr class="border-b"><td class="py-1.5 font-medium">BS-Darlehen (Rate / Dauer)</td><td id="tblBSInfo" class="py-1.5 text-right font-medium text-amber-600">0 € (0 J.)</td><td class="py-1.5 text-right text-slate-400">–</td></tr>
             <tr class="border-b"><td class="py-1.5 font-medium">Bank-Anschlusskredit (Lücke)</td><td id="tblGapBS" class="py-1.5 text-right">0 €</td><td id="tblGapEigen" class="py-1.5 text-right">0 €</td></tr>
             <!-- NEU: Fall A (Zwischenfinanzierung) bzw. Fall C (Zwischenparken) -->
@@ -293,7 +294,7 @@
         <div class="mt-3 space-y-3 pt-2 border-t border-slate-200 text-slate-700">
           <p><strong>Summe aller Aufwendungen im Vergleich:</strong></p>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div class="p-3 bg-amber-50/50 rounded-lg border border-amber-200"><p class="font-bold text-amber-900">Gesamtkosten Mit Bausparer</p><ul class="mt-1 space-y-0.5 text-[11px] text-amber-800"><li>Erstfinanzierung Raten: <span id="calcFormulaTotBsInit">0 €</span></li><li>+ Bauspar Sparraten: <span id="calcFormulaTotBsSpar">0 €</span></li><li>+ BS-Darlehen + Zinsen: <span id="calcFormulaTotBsDarlehen">0 €</span></li><li>+ Banklücke + Zinsen: <span id="calcFormulaTotBsGap">0 €</span></li><li class="font-bold border-t border-amber-300 pt-1 mt-1 text-slate-900">= Summe: <span id="calcFormulaTotBsSum">0 €</span></li></ul></div>
+            <div class="p-3 bg-amber-50/50 rounded-lg border border-amber-200"><p class="font-bold text-amber-900">Gesamtkosten Mit Bausparer</p><ul class="mt-1 space-y-0.5 text-[11px] text-amber-800"><li>Erstfinanzierung Raten: <span id="calcFormulaTotBsInit">0 €</span></li><li>+ Bauspar Sparraten (ohne Abschlussgebühr): <span id="calcFormulaTotBsSpar">0 €</span></li><li>+ Abschlussgebühr: <span id="calcFormulaTotBsFee">0 €</span></li><li>+ BS-Darlehen + Zinsen: <span id="calcFormulaTotBsDarlehen">0 €</span></li><li>+ Banklücke + Zinsen: <span id="calcFormulaTotBsGap">0 €</span></li><li class="font-bold border-t border-amber-300 pt-1 mt-1 text-slate-900">= Summe: <span id="calcFormulaTotBsSum">0 €</span></li></ul></div>
             <div class="p-3 bg-emerald-50/50 rounded-lg border border-emerald-200"><p class="font-bold text-emerald-900">Gesamtkosten Eigenanlage</p><ul class="mt-1 space-y-0.5 text-[11px] text-emerald-800"><li>Erstfinanzierung Raten: <span id="calcFormulaTotEigenInit">0 €</span></li><li>+ Eigenanlage Sparraten: <span id="calcFormulaTotEigenSpar">0 €</span></li><li>+ Bankkredit + Zinsen: <span id="calcFormulaTotEigenGap">0 €</span></li><li class="font-bold border-t border-emerald-300 pt-1 mt-1 text-slate-900">= Summe: <span id="calcFormulaTotEigenSum">0 €</span></li></ul></div>
           </div>
           <p class="pt-1"><strong>Kritischer Break-Even Bankzins:</strong> Bei einem Anschluss-Sollzins der Bank von <strong id="calcFormulaBreakEven" class="text-blue-600">0,00 % p.a.</strong> liefern beide Finanzierungswege exakt dieselben Gesamtkosten.</p>
@@ -718,7 +719,7 @@ function computeModel(p) {
             totalOutlayBS, totalOutlayEigen, gesamtMonateBS, gesamtMonateEigen, npvPhasesBS, npvPhasesEigen,
             initialPaidInPeriod: pmt_init * zinsbindungMonate, totalSparEinzahlungenEigen,
             fvEigenFinal: fvEigenAtZB, eigenSparMonate: zinsbindungMonate,
-            zwischen: { schedule: zwischenResult.schedule, zinsenTotal: zwischenResult.zinsenTotal, monate: zwischenMonate, restschuld: zwischenRestschuld, pmt: pmt_init },
+            zwischen: { schedule: zwischenResult.schedule, paidTotal: zwischenPaidTotal, zinsenTotal: zwischenResult.zinsenTotal, monate: zwischenMonate, restschuld: zwischenRestschuld, pmt: pmt_init },
             park: null
         });
     } else { // Fall C
@@ -852,7 +853,7 @@ function renderScheduleTable(schedule) {
     return html;
 }
 
-function updateBarChart(initialPaid, sparraten, bsDarlehen, bsZinsen, zwischenZinsen, bsGap, eigenGap, eigenZinsen) {
+function updateBarChart(initialPaidBS, initialPaidEigen, sparratenBS, sparratenEigen, bsFee, bsDarlehen, bsZinsen, zwischenAufwand, bsGap, eigenGap, eigenZinsen) {
     const ctx = document.getElementById('barChart').getContext('2d');
     if (barChart) barChart.destroy();
     barChart = new Chart(ctx, {
@@ -860,10 +861,11 @@ function updateBarChart(initialPaid, sparraten, bsDarlehen, bsZinsen, zwischenZi
         data: {
             labels: ['Mit Bausparvertrag', 'Mit Eigenanlage'],
             datasets: [
-                { label: 'Gezahlt Erstfinanzierung', data: [initialPaid, initialPaid], backgroundColor: '#94a3b8' },
-                { label: 'Akkumulierte Sparrate', data: [sparraten, sparraten], backgroundColor: '#64748b' },
+                { label: 'Gezahlt Erstfinanzierung', data: [initialPaidBS, initialPaidEigen], backgroundColor: '#94a3b8' },
+                { label: 'Akkumulierte Sparrate', data: [sparratenBS, sparratenEigen], backgroundColor: '#64748b' },
+                { label: 'Abschlussgebühr Bausparvertrag', data: [bsFee, 0], backgroundColor: '#b45309' },
                 { label: 'BS-Darlehen / Eigenkapital', data: [bsDarlehen, 0], backgroundColor: '#f59e0b' },
-                { label: 'Zinskosten Zwischenfinanzierung', data: [zwischenZinsen, 0], backgroundColor: '#a855f7' },
+                { label: 'Zwischenfinanzierung (Raten)', data: [zwischenAufwand, 0], backgroundColor: '#a855f7' },
                 { label: 'Finanzierungslücke Bank (Tilgung)', data: [bsGap, eigenGap], backgroundColor: '#3b82f6' },
                 { label: 'Zinskosten Anschlussphase', data: [bsZinsen, eigenZinsen], backgroundColor: '#ef4444' }
             ]
@@ -1008,6 +1010,7 @@ function calculate() {
     const totalOutlayEigen = model.totalOutlayEigen;
     const fvEigen = model.fvEigenFinal;
     const totalSparEinzahlungenBS = model.totalSparEinzahlungenBS;
+    const totalSparEinzahlungenEigen = model.totalSparEinzahlungenEigen;
 
     // ---------- Break-Even ----------
     const breakEvenRate = calculateBreakEvenForVollkosten(p);
@@ -1087,6 +1090,7 @@ function calculate() {
     document.getElementById('tblAnsparRateEigen').innerText = formatEUR(pmt_anspar_gesamt) + " / M.";
     document.getElementById('tblGuthabenBS').innerText = formatEUR(targetGuthaben);
     document.getElementById('tblGuthabenEigen').innerText = formatEUR(fvEigen);
+    document.getElementById('tblFeeBS').innerText = formatEUR(model.fee);
     document.getElementById('tblBSInfo').innerText = bsDarlehen > 0.001 ? `${formatEUR(p.bsRateDarlehen)} (${formatDuration(bsSim.bsMonate)})` : "–";
     document.getElementById('tblGapBS').innerText = formatEUR(bsGapLoan);
     document.getElementById('tblGapEigen').innerText = formatEUR(eigenBankLoan);
@@ -1221,7 +1225,8 @@ function calculate() {
     document.getElementById('calcFormulaEigenZinsen').innerText = formatEUR(eigenGapDetails.zinsen);
 
     document.getElementById('calcFormulaTotBsInit').innerText = formatEUR(model.initialPaidInPeriod);
-    document.getElementById('calcFormulaTotBsSpar').innerText = formatEUR(totalSparEinzahlungenBS);
+    document.getElementById('calcFormulaTotBsSpar').innerText = formatEUR(Math.max(0, totalSparEinzahlungenBS - model.fee));
+    document.getElementById('calcFormulaTotBsFee').innerText = formatEUR(model.fee);
     document.getElementById('calcFormulaTotBsDarlehen').innerText = formatEUR(bsDarlehen + bsSim.bsZinsenTotal + bsSim.bsRestschuld);
     document.getElementById('calcFormulaTotBsGap').innerText = formatEUR(bsGapLoan + bsSim.gapZinsenTotal + bsSim.gapRestschuld);
     document.getElementById('calcFormulaTotBsSum').innerText = formatEUR(totalOutlayBS);
@@ -1240,8 +1245,10 @@ function calculate() {
     document.getElementById('tableContainerStep3BSGap').innerHTML = renderScheduleTable(bsSim.gapSchedule);
     document.getElementById('tableContainerStep3EigenGap').innerHTML = renderScheduleTable(eigenGapDetails.schedule);
 
-    const zwischenZinsenBar = model.zwischen ? model.zwischen.zinsenTotal : 0;
-    updateBarChart(model.initialPaidInPeriod, totalSparEinzahlungenBS, bsDarlehen, bsSim.bsZinsenTotal + bsSim.gapZinsenTotal, zwischenZinsenBar, bsGapLoan, eigenBankLoan, eigenGapDetails.zinsen);
+    const zwischenAufwandBar = model.zwischen ? model.zwischen.paidTotal : 0;
+    const sparrateBSBar = Math.max(0, totalSparEinzahlungenBS - model.fee);
+    const sparrateEigenBar = totalSparEinzahlungenEigen;
+    updateBarChart(model.initialPaidInPeriod, model.initialPaidInPeriod, sparrateBSBar, sparrateEigenBar, model.fee, bsDarlehen, bsSim.bsZinsenTotal + bsSim.gapZinsenTotal, zwischenAufwandBar, bsGapLoan, eigenBankLoan, eigenGapDetails.zinsen);
     updateLineChart(curveLabels, curveData);
 }
 
