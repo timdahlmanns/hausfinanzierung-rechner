@@ -662,6 +662,7 @@ function computeModel(p) {
             calculatedRestschuld, bsGapLoan, bsSim, initialCombinedRateBS, eigenBankLoan, targetEigenRate, eigenGapDetails,
             totalOutlayBS, totalOutlayEigen, gesamtMonateBS, gesamtMonateEigen, npvPhasesBS, npvPhasesEigen,
             initialPaidInPeriod: pmt_init * zinsbindungMonate, totalSparEinzahlungenEigen: totalSparEinzahlungenBS,
+            fvEigenFinal: fvEigenAtZuteilung, eigenSparMonate: zuteilungMonate,
             zwischen: null, park: null
         });
     } else if (fall === 'A') {
@@ -716,6 +717,7 @@ function computeModel(p) {
             calculatedRestschuld: restschuldZB, bsGapLoan, bsSim, initialCombinedRateBS, eigenBankLoan, eigenGapDetails,
             totalOutlayBS, totalOutlayEigen, gesamtMonateBS, gesamtMonateEigen, npvPhasesBS, npvPhasesEigen,
             initialPaidInPeriod: pmt_init * zinsbindungMonate, totalSparEinzahlungenEigen,
+            fvEigenFinal: fvEigenAtZB, eigenSparMonate: zinsbindungMonate,
             zwischen: { schedule: zwischenResult.schedule, zinsenTotal: zwischenResult.zinsenTotal, monate: zwischenMonate, restschuld: zwischenRestschuld, pmt: pmt_init },
             park: null
         });
@@ -783,6 +785,7 @@ function computeModel(p) {
             calculatedRestschuld: restschuldZBBs, bsGapLoan, bsSim, initialCombinedRateBS, eigenBankLoan, eigenGapDetails,
             totalOutlayBS, totalOutlayEigen, gesamtMonateBS, gesamtMonateEigen, npvPhasesBS, npvPhasesEigen,
             initialPaidInPeriod: pmt_init * zuteilungMonate + step1BSPaid, totalSparEinzahlungenEigen: totalSparEinzahlungenBS,
+            fvEigenFinal: fvEigenAtZuteilung, eigenSparMonate: zuteilungMonate,
             zwischen: null,
             park: {
                 parkBetragBS, parkFV_BS, sondertilgungBS, sondertilgungMax, zParkMonate,
@@ -1003,7 +1006,7 @@ function calculate() {
     const calculatedRestschuld = model.calculatedRestschuld;
     const totalOutlayBS = model.totalOutlayBS;
     const totalOutlayEigen = model.totalOutlayEigen;
-    const fvEigen = model.fvEigenAtZuteilung;
+    const fvEigen = model.fvEigenFinal;
     const totalSparEinzahlungenBS = model.totalSparEinzahlungenBS;
 
     // ---------- Break-Even ----------
@@ -1197,12 +1200,12 @@ function calculate() {
     document.getElementById('calcFormulaEigenRVal').innerText = formatEUR(R);
     document.getElementById('calcFormulaEigenRenditePct').innerText = (p.eigenRendite * 100).toFixed(1);
     document.getElementById('calcFormulaEigenRenditePct2').innerText = (p.eigenRendite * 100).toFixed(1);
-    document.getElementById('calcFormulaEigenMonate').innerText = zuteilungMonate;
+    document.getElementById('calcFormulaEigenMonate').innerText = model.eigenSparMonate;
     document.getElementById('calcFormulaEigenFinalGuthaben').innerText = formatEUR(fvEigen);
 
     document.getElementById('calcFormulaTotalAnspar').innerText = formatEUR(totalSparEinzahlungenBS);
     document.getElementById('calcFormulaBsFinalGuthaben').innerText = formatEUR(targetGuthaben);
-    document.getElementById('calcFormulaEigenZinsgewinn').innerText = formatEUR(fvEigen - totalSparEinzahlungenBS);
+    document.getElementById('calcFormulaEigenZinsgewinn').innerText = formatEUR(fvEigen - model.totalSparEinzahlungenEigen);
 
     document.getElementById('calcFormulaBsMonateCount').innerText = bsSim.bsMonate;
     document.getElementById('calcFormulaBsDarlehenPmtVal').innerText = formatEUR(bsDarlehen > 0.001 ? p.bsRateDarlehen : 0);
