@@ -398,56 +398,6 @@ function runLoanWithLumpSumAtStart(balance, ratePct, pmt, months, lumpSum) {
     return { schedule, zinsenTotal: zinsen, restschuld: Math.max(0, bal), monate: mCount };
 }
 
-/* Zwei-Phasen-Darlehen für den Eigenanlage-Pfad in Fall A: Phase 1 läuft
-   fix `monthsPhase1` Monate mit `pmtPhase1` (Budget-Parität zur
-   BS-Zwischenphase), Phase 2 amortisiert vollständig mit `pmtPhase2`
-   (inkl. Mindestraten-Schutz wie runBankLoanDetailsByPmt). */
-function runTwoPhaseLoan(balance, ratePct, pmtPhase1, monthsPhase1, pmtPhase2) {
-    if (balance <= 0) return { pmt: pmtPhase2, zinsen: 0, monate: 0, schedule: [], restschuld: 0, angehoben: false, phase1Monate: 0, phase2Monate: 0 };
-    let bal = balance;
-    const r = ratePct / 12;
-    let zinsen = 0, m = 0;
-    const schedule = [];
-    let angehoben = false;
-
-    let pmt1 = pmtPhase1;
-    const minPmt1 = bal * r;
-    if (monthsPhase1 > 0 && pmt1 <= minPmt1) { angehoben = true; pmt1 = minPmt1 * 1.01 + 1; }
-
-    let phase1Monate = 0;
-    const mCount1 = Math.max(0, Math.round(monthsPhase1));
-    for (let i = 0; i < mCount1 && bal > 0.001; i++) {
-        m++;
-        const intr = bal * r;
-        const currentPmt = Math.min(pmt1, bal + intr);
-        const prin = currentPmt - intr;
-        if (prin <= 0) break;
-        bal -= prin;
-        zinsen += intr;
-        schedule.push({ m, pmt: currentPmt, intr, prin, bal: Math.max(0, bal) });
-        phase1Monate++;
-    }
-
-    let phase2Monate = 0;
-    if (bal > 0.001) {
-        const minPmt2 = bal * (ratePct + 0.005) / 12;
-        let pmt2 = pmtPhase2;
-        if (pmt2 < minPmt2) { angehoben = true; pmt2 = minPmt2; }
-        while (bal > 0.01 && m < 1200) {
-            m++;
-            const intr = bal * r;
-            const currentPmt = Math.min(pmt2, bal + intr);
-            const prin = currentPmt - intr;
-            if (prin <= 0) break;
-            bal -= prin;
-            zinsen += intr;
-            schedule.push({ m, pmt: currentPmt, intr, prin, bal: Math.max(0, bal) });
-            phase2Monate++;
-        }
-    }
-    return { pmt: pmtPhase2, zinsen, monate: m, schedule, restschuld: Math.max(0, bal), angehoben, phase1Monate, phase2Monate };
-}
-
 /* Erzeugt eine einfache Verzinsungstabelle für geparktes Kapital
    (keine Tilgung, nur Zinseszins bis zum Zinsbindungsende). */
 function generateParkSchedule(amount, ratePct, months) {
@@ -723,26 +673,23 @@ function computeModel(p) {
         const bsGapLoan = Math.max(0, zwischenRestschuld - p.bsSumme);
         const bsSim = runCombinedBausparAndGapLoan(bsDarlehen, p.bsSollzins, p.bsRateDarlehen, bsGapLoan, p.bankBauzins, p.bankTilgung);
         pushBsSimWarnungen(warnungen, bsSim);
-        warnungen.push("Fall A: Die Ablösung des Zwischendarlehens durch Bausparguthaben und -darlehen wird ohne Vorfälligkeitsentschädigung modelliert. Das setzt voraus, dass die Zinsbindung des Zwischendarlehens passend zum Zuteilungstermin gewählt wird.");
+        warnungen.push("Fall A: Die Zwischenfinanzierung wird nur für den BS-Pfad benötigt (Bausparguthaben & -darlehen liegen erst bei Zuteilung vor). Die Ablösung durch Bausparguthaben und -darlehen wird ohne Vorfälligkeitsentschädigung modelliert – das setzt voraus, dass die Zinsbindung des Zwischendarlehens passend zum Zuteilungstermin gewählt wird.");
 
         const initialCombinedRateBS = computeInitialCombinedRateBS(bsDarlehen, p, bsSim);
 
+        // Eigenanlage-Pfad: keine Zwischenfinanzierung nötig – es wird nur bis zum
+        // Zinsbindungsende gespart (nicht bis zur BS-Zuteilung), das gesamte
+        // Eigenkapital wird bei T_zb sofort sondergetilgt und die Anschluss-
+        // finanzierung startet unmittelbar als normaler Einphasen-Kredit.
         const fvEigenAtZB = (r_e > 0) ? R * ((Math.pow(1 + r_e, zinsbindungMonate) - 1) / r_e) : (R * zinsbindungMonate);
         const eigenBankLoan = Math.max(0, restschuldZB - fvEigenAtZB);
-        const zwischenPhasePmt = pmt_init + R;
-        const targetEigenRatePhase2 = initialCombinedRateBS > 0 ? initialCombinedRateBS : (eigenBankLoan * (p.bankBauzins + p.bankTilgung) / 12);
-        const eigenGapDetails = runTwoPhaseLoan(eigenBankLoan, p.bankBauzins, zwischenPhasePmt, zwischenMonate, targetEigenRatePhase2);
-        if (eigenGapDetails.angehoben) warnungen.push(`Budget-Parität verletzt: Die Rate des Eigenanlage-Bankkredits musste angehoben werden, damit der Kredit tilgt.`);
+        const targetEigenRate = computeTargetEigenRate(initialCombinedRateBS, eigenBankLoan, p);
+        const eigenGapDetails = runBankLoanDetailsByPmt(eigenBankLoan, p.bankBauzins, targetEigenRate);
+        if (eigenGapDetails.angehoben) warnungen.push(`Budget-Parität verletzt: Die Rate des Eigenanlage-Bankkredits musste von ${formatEUR(targetEigenRate)} auf ${formatEUR(eigenGapDetails.pmt)} angehoben werden.`);
         pushEigenGapWarnung(warnungen, eigenGapDetails);
 
         const totalSparEinzahlungenEigen = R * zinsbindungMonate;
         const zwischenPaidTotal = zwischenResult.schedule.reduce((s, r) => s + r.pmt, 0);
-        // Zinsen, die der Eigenanlage-Pfad während der Zwischenphase (T_zb -> T_z)
-        // auf den bereits final aufgenommenen Bankkredit zahlt – zum direkten
-        // Vergleich mit den Zwischendarlehens-Zinsen des BS-Pfads.
-        const eigenZwischenphaseZinsen = eigenGapDetails.schedule
-            .slice(0, eigenGapDetails.phase1Monate)
-            .reduce((s, r) => s + r.intr, 0);
 
         const totalOutlayBS = pmt_init * zinsbindungMonate + zwischenPaidTotal + totalSparEinzahlungenBS
                              + bsDarlehen + bsSim.bsZinsenTotal + bsSim.bsRestschuld
@@ -769,7 +716,7 @@ function computeModel(p) {
             calculatedRestschuld: restschuldZB, bsGapLoan, bsSim, initialCombinedRateBS, eigenBankLoan, eigenGapDetails,
             totalOutlayBS, totalOutlayEigen, gesamtMonateBS, gesamtMonateEigen, npvPhasesBS, npvPhasesEigen,
             initialPaidInPeriod: pmt_init * zinsbindungMonate, totalSparEinzahlungenEigen,
-            zwischen: { schedule: zwischenResult.schedule, zinsenTotal: zwischenResult.zinsenTotal, monate: zwischenMonate, restschuld: zwischenRestschuld, pmt: pmt_init, zinsenTotalEigen: eigenZwischenphaseZinsen },
+            zwischen: { schedule: zwischenResult.schedule, zinsenTotal: zwischenResult.zinsenTotal, monate: zwischenMonate, restschuld: zwischenRestschuld, pmt: pmt_init },
             park: null
         });
     } else { // Fall C
@@ -977,10 +924,10 @@ function updateStep2b(model) {
 
     if (model.fall === 'A') {
         step2b.classList.remove('hidden');
-        titel.innerText = 'Zwischenphase (Zwischendarlehen)';
+        titel.innerText = 'Zwischenphase (Zwischendarlehen, nur BS-Pfad)';
         content.innerHTML = `
             <div class="bg-amber-50/60 p-3.5 rounded-xl border border-amber-200 space-y-1"><p class="font-bold text-amber-900">Zwischendarlehen (Restschuld @ Zinsbindungsende)</p><p class="text-xl font-bold text-slate-900">${formatEUR(model.restschuldZB)}</p><p class="text-[11px] text-amber-700">Zins: ${(model.p.zwischenZins * 100).toFixed(2)} % · Laufzeit: ${formatDuration(model.zwischen.monate)}</p></div>
-            <div class="bg-red-50/60 p-3.5 rounded-xl border border-red-200 space-y-1"><p class="font-bold text-red-900">Zinskosten Zwischenphase</p><p class="text-xl font-bold text-slate-900">${formatEUR(model.zwischen.zinsenTotal)}</p><p class="text-[11px] text-red-700">Während Zwischenfinanzierung angefallen</p></div>
+            <div class="bg-red-50/60 p-3.5 rounded-xl border border-red-200 space-y-1"><p class="font-bold text-red-900">Zinskosten Zwischenphase</p><p class="text-xl font-bold text-slate-900">${formatEUR(model.zwischen.zinsenTotal)}</p><p class="text-[11px] text-red-700">Während Zwischenfinanzierung angefallen (nur BS-Pfad – die Eigenanlage braucht keine Zwischenfinanzierung, da ihr Kapital schon bei Zinsbindungsende verfügbar ist)</p></div>
             <div class="bg-purple-50/60 p-3.5 rounded-xl border border-purple-200 space-y-1"><p class="font-bold text-purple-900">Restschuld bei Zuteilung</p><p class="text-xl font-bold text-slate-900">${formatEUR(model.zwischen.restschuld)}</p><p class="text-[11px] text-purple-700">Wird durch BS-Guthaben &amp; -Darlehen abgelöst</p></div>`;
         tableContainer.innerHTML = renderScheduleTable(model.zwischen.schedule);
     } else if (model.fall === 'C') {
@@ -1141,14 +1088,16 @@ function calculate() {
     document.getElementById('tblGapBS').innerText = formatEUR(bsGapLoan);
     document.getElementById('tblGapEigen').innerText = formatEUR(eigenBankLoan);
 
-    // ---------- NEU: Zwischenfinanzierung (Fall A) / Zwischenparken (Fall C) ----------
+    // ---------- Zwischenfinanzierung (Fall A, nur BS-Pfad) / Zwischenparken (Fall C, beide Pfade) ----------
     const trZwischenPark = document.getElementById('trZwischenPark');
     if (model.fall === 'A') {
         trZwischenPark.classList.remove('hidden');
-        document.getElementById('tblZwischenParkLabel').innerText = `Zwischenfinanz. Zinsen (${formatDuration(model.zwischen.monate)})`;
+        document.getElementById('tblZwischenParkLabel').innerText = `Zwischenfinanz.-Zinsen (nur BS, ${formatDuration(model.zwischen.monate)})`;
         document.getElementById('tblZwischenParkBS').innerText = formatEUR(model.zwischen.zinsenTotal);
-        document.getElementById('tblZwischenParkEigen').innerText = model.zwischen.zinsenTotalEigen > 0.001
-            ? formatEUR(model.zwischen.zinsenTotalEigen) : "– (kein Zwischendarlehen nötig)";
+        // Der Eigenanlage-Pfad braucht keine Zwischenfinanzierung: es wird nur bis
+        // zum Zinsbindungsende gespart, das Kapital sondertilgt sofort und die
+        // Anschlussfinanzierung startet direkt (echter struktureller Vorteil).
+        document.getElementById('tblZwischenParkEigen').innerText = "– (nicht nötig)";
     } else if (model.fall === 'C') {
         trZwischenPark.classList.remove('hidden');
         document.getElementById('tblZwischenParkLabel').innerText = `Zwischenparken, Endwert (${formatDuration(model.park.zParkMonate)})`;
