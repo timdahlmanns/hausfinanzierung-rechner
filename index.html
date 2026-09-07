@@ -106,22 +106,22 @@
       <div>
         <h2 class="text-base font-semibold text-slate-900 border-b pb-2 mb-3">Gesamtkosten Haus &amp; Raten</h2>
         <table class="w-full text-xs text-left text-slate-600">
-          <thead><tr class="border-b font-semibold text-slate-700"><th class="py-1">Baustein</th><th class="py-1 text-right text-amber-600">Mit BS</th><th class="py-1 text-right text-emerald-600">Ohne BS</th></tr></thead>
+          <thead><tr class="border-b font-semibold text-slate-700"><th class="py-1">Baustein</th><th class="py-1 text-right text-amber-600">Mit BS</th><th class="py-1 text-right text-emerald-600">Ohne BS</th><th class="py-1 text-right text-slate-700">Ohne sparen</th></tr></thead>
           <tbody>
-            <tr class="border-b bg-blue-50/40"><td class="py-1.5 font-bold text-slate-800">Gesamtrate Ansparphase</td><td id="tblAnsparRateBS" class="py-1.5 text-right font-bold text-blue-700">0 €</td><td id="tblAnsparRateEigen" class="py-1.5 text-right font-bold text-blue-700">0 €</td></tr>
-            <tr class="border-b"><td class="py-1.5 font-medium">Sparguthaben Akkumuliert</td><td id="tblGuthabenBS" class="py-1.5 text-right font-semibold text-amber-600">0 €</td><td id="tblGuthabenEigen" class="py-1.5 text-right font-semibold text-emerald-600">0 €</td></tr>
-            <tr class="border-b"><td class="py-1.5 font-medium">BS-Abschlussgebühr</td><td id="tblFeeBS" class="py-1.5 text-right font-medium text-amber-700">0 €</td><td class="py-1.5 text-right text-slate-400">–</td></tr>
-            <tr class="border-b"><td class="py-1.5 font-medium">BS-Darlehen (Rate / Dauer)</td><td id="tblBSInfo" class="py-1.5 text-right font-medium text-amber-600">0 € (0 J.)</td><td class="py-1.5 text-right text-slate-400">–</td></tr>
-            <tr class="border-b"><td class="py-1.5 font-medium">Bank-Anschlusskredit (Lücke)</td><td id="tblGapBS" class="py-1.5 text-right">0 €</td><td id="tblGapEigen" class="py-1.5 text-right">0 €</td></tr>
+            <tr class="border-b bg-blue-50/40"><td class="py-1.5 font-bold text-slate-800">Gesamtrate Ansparphase</td><td id="tblAnsparRateBS" class="py-1.5 text-right font-bold text-blue-700">0 €</td><td id="tblAnsparRateEigen" class="py-1.5 text-right font-bold text-blue-700">0 €</td><td id="tblAnsparRateNoSave" class="py-1.5 text-right font-bold text-blue-700">0 €</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-medium">Sparguthaben Akkumuliert</td><td id="tblGuthabenBS" class="py-1.5 text-right font-semibold text-amber-600">0 €</td><td id="tblGuthabenEigen" class="py-1.5 text-right font-semibold text-emerald-600">0 €</td><td id="tblGuthabenNoSave" class="py-1.5 text-right text-slate-400">–</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-medium">BS-Abschlussgebühr</td><td id="tblFeeBS" class="py-1.5 text-right font-medium text-amber-700">0 €</td><td class="py-1.5 text-right text-slate-400">–</td><td class="py-1.5 text-right text-slate-400">–</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-medium">BS-Darlehen (Rate / Dauer)</td><td id="tblBSInfo" class="py-1.5 text-right font-medium text-amber-600">0 € (0 J.)</td><td class="py-1.5 text-right text-slate-400">–</td><td class="py-1.5 text-right text-slate-400">–</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-medium">Bank-Anschlusskredit (Lücke)</td><td id="tblGapBS" class="py-1.5 text-right">0 €</td><td id="tblGapEigen" class="py-1.5 text-right">0 €</td><td id="tblGapNoSave" class="py-1.5 text-right">0 €</td></tr>
             <!-- NEU: Fall A (Zwischenfinanzierung) bzw. Fall C (Zwischenparken) -->
-            <tr id="trZwischenPark" class="border-b bg-amber-50/40 hidden"><td id="tblZwischenParkLabel" class="py-1.5 font-medium">Zwischenphase</td><td id="tblZwischenParkBS" class="py-1.5 text-right font-medium text-amber-700">0 €</td><td id="tblZwischenParkEigen" class="py-1.5 text-right font-medium text-amber-700">0 €</td></tr>
-            <tr class="border-b"><td class="py-1.5 font-medium align-top">Bank-Kredit Raten &amp; Dauer</td><td id="tblBankInfoBS" class="py-1.5 text-right font-medium leading-tight">0 €</td><td id="tblBankInfoEigen" class="py-1.5 text-right font-semibold text-emerald-600 align-top">0 € (0 J.)</td></tr>
-            <tr class="border-b"><td class="py-1.5 font-medium">Zinsen Anschlussphase</td><td id="tblZinsenAnschlussBS" class="py-1.5 text-right text-red-500">0 €</td><td id="tblZinsenAnschlussEigen" class="py-1.5 text-right text-red-500">0 €</td></tr>
+            <tr id="trZwischenPark" class="border-b bg-amber-50/40 hidden"><td id="tblZwischenParkLabel" class="py-1.5 font-medium">Zwischenphase</td><td id="tblZwischenParkBS" class="py-1.5 text-right font-medium text-amber-700">0 €</td><td id="tblZwischenParkEigen" class="py-1.5 text-right font-medium text-amber-700">0 €</td><td id="tblZwischenParkNoSave" class="py-1.5 text-right font-medium text-slate-500">0 €</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-medium align-top">Bank-Kredit Raten &amp; Dauer</td><td id="tblBankInfoBS" class="py-1.5 text-right font-medium leading-tight">0 €</td><td id="tblBankInfoEigen" class="py-1.5 text-right font-semibold text-emerald-600 align-top">0 € (0 J.)</td><td id="tblBankInfoNoSave" class="py-1.5 text-right font-medium text-slate-700 align-top">0 € (0 J.)</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-medium">Zinsen Anschlussphase</td><td id="tblZinsenAnschlussBS" class="py-1.5 text-right text-red-500">0 €</td><td id="tblZinsenAnschlussEigen" class="py-1.5 text-right text-red-500">0 €</td><td id="tblZinsenAnschlussNoSave" class="py-1.5 text-right text-red-500">0 €</td></tr>
             <!-- NEU -->
-            <tr class="border-b bg-purple-50/40"><td class="py-1.5 font-medium">Gesamtlaufzeit</td><td id="tblLaufzeitBS" class="py-1.5 text-right font-semibold text-purple-700">0 J.</td><td id="tblLaufzeitEigen" class="py-1.5 text-right font-semibold text-purple-700">0 J.</td></tr>
-            <tr class="border-b"><td class="py-2 font-bold text-slate-900">Gesamtkosten (nominal)</td><td id="tblTotalBS" class="py-2 text-right font-bold text-slate-900">0 €</td><td id="tblTotalEigen" class="py-2 text-right font-bold text-slate-900">0 €</td></tr>
+            <tr class="border-b bg-purple-50/40"><td class="py-1.5 font-medium">Gesamtlaufzeit</td><td id="tblLaufzeitBS" class="py-1.5 text-right font-semibold text-purple-700">0 J.</td><td id="tblLaufzeitEigen" class="py-1.5 text-right font-semibold text-purple-700">0 J.</td><td id="tblLaufzeitNoSave" class="py-1.5 text-right font-semibold text-purple-700">0 J.</td></tr>
+            <tr class="border-b"><td class="py-2 font-bold text-slate-900">Gesamtkosten (nominal)</td><td id="tblTotalBS" class="py-2 text-right font-bold text-slate-900">0 €</td><td id="tblTotalEigen" class="py-2 text-right font-bold text-slate-900">0 €</td><td id="tblTotalNoSave" class="py-2 text-right font-bold text-slate-900">0 €</td></tr>
             <!-- NEU -->
-            <tr class="bg-purple-50/40"><td class="py-2 font-bold text-purple-900">Barwert aller Zahlungen</td><td id="tblNpvBS" class="py-2 text-right font-bold text-purple-800">0 €</td><td id="tblNpvEigen" class="py-2 text-right font-bold text-purple-800">0 €</td></tr>
+            <tr class="bg-purple-50/40"><td class="py-2 font-bold text-purple-900">Barwert aller Zahlungen</td><td id="tblNpvBS" class="py-2 text-right font-bold text-purple-800">0 €</td><td id="tblNpvEigen" class="py-2 text-right font-bold text-purple-800">0 €</td><td id="tblNpvNoSave" class="py-2 text-right font-bold text-purple-800">0 €</td></tr>
           </tbody>
         </table>
       </div>
@@ -685,7 +685,7 @@ function computeModel(p) {
         // finanzierung startet unmittelbar als normaler Einphasen-Kredit.
         const fvEigenAtZB = (r_e > 0) ? R * ((Math.pow(1 + r_e, zinsbindungMonate) - 1) / r_e) : (R * zinsbindungMonate);
         const eigenBankLoan = Math.max(0, restschuldZB - fvEigenAtZB);
-        const targetEigenRate = computeTargetEigenRate(initialCombinedRateBS, eigenBankLoan, p);
+        const targetEigenRate = pmt_anspar_gesamt;
         const eigenGapDetails = runBankLoanDetailsByPmt(eigenBankLoan, p.bankBauzins, targetEigenRate);
         if (eigenGapDetails.angehoben) warnungen.push(`Budget-Parität verletzt: Die Rate des Eigenanlage-Bankkredits musste von ${formatEUR(targetEigenRate)} auf ${formatEUR(eigenGapDetails.pmt)} angehoben werden.`);
         pushEigenGapWarnung(warnungen, eigenGapDetails);
@@ -1008,6 +1008,11 @@ function calculate() {
     const fvEigen = model.fvEigenFinal;
     const totalSparEinzahlungenBS = model.totalSparEinzahlungenBS;
     const totalSparEinzahlungenEigen = model.totalSparEinzahlungenEigen;
+    const noSaveInitDetails = runFixedTermLoan(p.initSumme, p.initZins, pmt_anspar_gesamt, zinsbindungMonate);
+    const noSaveRestschuldZB = noSaveInitDetails.restschuld;
+    const noSaveAnschlussDetails = runBankLoanDetailsByPmt(noSaveRestschuldZB, p.bankBauzins, pmt_anspar_gesamt);
+    const noSaveInitPaid = noSaveInitDetails.schedule.reduce((sum, row) => sum + row.pmt, 0);
+    const totalOutlayNoSave = noSaveInitPaid + noSaveRestschuldZB + noSaveAnschlussDetails.zinsen + noSaveAnschlussDetails.restschuld;
 
     // ---------- Break-Even ----------
     const breakEvenRate = calculateBreakEvenForVollkosten(p);
@@ -1029,7 +1034,12 @@ function calculate() {
     const d_m = p.diskontZins / 12;
     const npvBS = computeNPV(model.npvPhasesBS, d_m);
     const npvEigen = computeNPV(model.npvPhasesEigen, d_m);
+    const npvNoSave = computeNPV([
+        { start: 0, pmt: pmt_anspar_gesamt, months: zinsbindungMonate },
+        { start: zinsbindungMonate, schedule: noSaveAnschlussDetails.schedule }
+    ], d_m);
     const npvDiff = npvBS - npvEigen;
+    const gesamtMonateNoSave = zinsbindungMonate + noSaveAnschlussDetails.monate;
 
     // ---------- UI: Fall-Badge & Schritt 2b ----------
     updateFallBadge(model.fall, p.zinsbindungJahre, p.bsZuteilungJahre);
@@ -1085,12 +1095,15 @@ function calculate() {
     // ---------- UI: Vergleichstabelle ----------
     document.getElementById('tblAnsparRateBS').innerText = formatEUR(pmt_anspar_gesamt) + " / M.";
     document.getElementById('tblAnsparRateEigen').innerText = formatEUR(pmt_anspar_gesamt) + " / M.";
+    document.getElementById('tblAnsparRateNoSave').innerText = formatEUR(pmt_anspar_gesamt) + " / M.";
     document.getElementById('tblGuthabenBS').innerText = formatEUR(targetGuthaben);
     document.getElementById('tblGuthabenEigen').innerText = formatEUR(fvEigen);
+    document.getElementById('tblGuthabenNoSave').innerText = "–";
     document.getElementById('tblFeeBS').innerText = formatEUR(model.fee);
     document.getElementById('tblBSInfo').innerText = bsDarlehen > 0.001 ? `${formatEUR(p.bsRateDarlehen)} (${formatDuration(bsSim.bsMonate)})` : "–";
     document.getElementById('tblGapBS').innerText = formatEUR(bsGapLoan);
     document.getElementById('tblGapEigen').innerText = formatEUR(eigenBankLoan);
+    document.getElementById('tblGapNoSave').innerText = formatEUR(noSaveRestschuldZB);
 
     // ---------- Zwischenfinanzierung (Fall A, nur BS-Pfad) / Zwischenparken (Fall C, nur BS-Pfad) ----------
     const trZwischenPark = document.getElementById('trZwischenPark');
@@ -1102,12 +1115,14 @@ function calculate() {
         // zum Zinsbindungsende gespart, das Kapital sondertilgt sofort und die
         // Anschlussfinanzierung startet direkt (echter struktureller Vorteil).
         document.getElementById('tblZwischenParkEigen').innerText = "– (nicht nötig)";
+        document.getElementById('tblZwischenParkNoSave').innerText = "–";
     } else if (model.fall === 'C') {
         trZwischenPark.classList.remove('hidden');
         document.getElementById('tblZwischenParkLabel').innerText = `Zwischenparken (nur BS), Endwert (${formatDuration(model.park.zParkMonate)})`;
         document.getElementById('tblZwischenParkBS').innerText = model.park.parkBetragBS > 0.001
             ? formatEUR(model.park.parkFV_BS) : "– (vollständig sondergetilgt)";
         document.getElementById('tblZwischenParkEigen').innerText = "– (nicht nötig)";
+        document.getElementById('tblZwischenParkNoSave').innerText = "–";
     } else {
         trZwischenPark.classList.add('hidden');
     }
@@ -1125,14 +1140,19 @@ function calculate() {
     }
 
     document.getElementById('tblBankInfoEigen').innerText = eigenBankLoan > 0 ? `${formatEUR(eigenGapDetails.pmt)} (${formatDuration(eigenGapDetails.monate)})` : "0 €";
+    document.getElementById('tblBankInfoNoSave').innerText = noSaveRestschuldZB > 0 ? `${formatEUR(noSaveAnschlussDetails.pmt)} (${formatDuration(noSaveAnschlussDetails.monate)})` : "0 €";
     document.getElementById('tblZinsenAnschlussBS').innerText = formatEUR(bsSim.bsZinsenTotal + bsSim.gapZinsenTotal);
     document.getElementById('tblZinsenAnschlussEigen').innerText = formatEUR(eigenGapDetails.zinsen);
+    document.getElementById('tblZinsenAnschlussNoSave').innerText = formatEUR(noSaveAnschlussDetails.zinsen);
     document.getElementById('tblLaufzeitBS').innerText = formatDuration(gesamtMonateBS);
     document.getElementById('tblLaufzeitEigen').innerText = formatDuration(gesamtMonateEigen);
+    document.getElementById('tblLaufzeitNoSave').innerText = formatDuration(gesamtMonateNoSave);
     document.getElementById('tblTotalBS').innerText = formatEUR(totalOutlayBS);
     document.getElementById('tblTotalEigen').innerText = formatEUR(totalOutlayEigen);
+    document.getElementById('tblTotalNoSave').innerText = formatEUR(totalOutlayNoSave);
     document.getElementById('tblNpvBS').innerText = formatEUR(npvBS);
     document.getElementById('tblNpvEigen').innerText = formatEUR(npvEigen);
+    document.getElementById('tblNpvNoSave').innerText = formatEUR(npvNoSave);
 
     // ---------- UI: Schritt 1 ----------
     document.getElementById('vStep1Summe').innerText = formatEUR(p.initSumme);
