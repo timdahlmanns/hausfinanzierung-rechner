@@ -70,7 +70,7 @@
       <div><label class="text-xs font-medium text-slate-600">Kreditsumme (€)</label><input type="number" id="initSumme" value="440000" step="5000" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
       <div><label class="text-xs font-medium text-slate-600">Sollzins p.a. (%)</label><input type="number" id="initZins" value="3.80" step="0.05" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
       <div><label class="text-xs font-medium text-slate-600">Anfängliche Tilgung (%)</label><input type="number" id="initTilgung" value="2.00" step="0.1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
-      <div><label class="text-xs font-medium text-slate-600">Optionale Ziel-Monatsrate (€)</label><input type="number" id="targetMonatsrate" value="" step="25" min="0" placeholder="z. B. 2500" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"><p class="text-[10px] text-slate-400 mt-1">Bei Eingabe werden Tilgungen und BS-Zuteilung automatisch auf möglichst konstante Gesamtrate kalibriert.</p></div>
+      <div><label class="text-xs font-medium text-slate-600">Optionale Ziel-Monatsrate (€)</label><input type="number" id="targetMonatsrate" value="" step="25" min="0" placeholder="z. B. 2500" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"><p class="text-[10px] text-slate-400 mt-1">Bei Eingabe werden Tilgungen und BS-Zuteilung automatisch kalibriert; zulässige Bandbreite der Monatslast: Zielrate ± 50 €.</p></div>
       <div><label class="text-xs font-medium text-slate-600">Zinsbindung Erstkredit (Jahre)</label><input type="number" id="zinsbindungJahre" value="10" step="1" min="1" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"></div>
     </div>
 
@@ -358,7 +358,7 @@ const INPUT_HELP_TEXTS = {
     initSumme: "Auszahlungsbetrag des Erstkredits zu Beginn der Finanzierung.",
     initZins: "Nominalzins des Erstkredits pro Jahr während der Zinsbindung.",
     initTilgung: "Anfänglicher jährlicher Tilgungssatz des Erstkredits.",
-    targetMonatsrate: "Optionales Ziel für eine möglichst konstante monatliche Gesamtbelastung über die gesamte Finanzierung.",
+    targetMonatsrate: "Optionales Ziel für die monatliche Gesamtbelastung; die Kalibrierung akzeptiert nur Verläufe innerhalb Zielrate ± 50 €.",
     zinsbindungJahre: "Dauer, für die der Sollzins des Erstkredits festgeschrieben ist.",
     bsSumme: "Vertraglich vereinbarte Bausparsumme aus Guthaben plus möglichem Bauspardarlehen.",
     bsZuteilungJahre: "Geplanter Zeitpunkt der Bauspar-Zuteilung in Jahren.",
@@ -672,11 +672,15 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
     const MAX_REASONABLE_OUTLAY = 1e10;
     const MIN_BANK_TILG = 0.005;
     const MAX_BANK_TILG = 0.12;
+    const RATE_BAND_EUR = 50;
+    const minAllowedRate = Math.max(0, targetRate - RATE_BAND_EUR);
+    const maxAllowedRate = targetRate + RATE_BAND_EUR;
 
     const isFeasibleCandidate = (model, monthlyTotals) => {
         if (!model || !Number.isFinite(model.totalOutlayBS) || model.totalOutlayBS <= 0 || model.totalOutlayBS > MAX_REASONABLE_OUTLAY) return false;
         if (!Array.isArray(monthlyTotals) || monthlyTotals.length === 0) return false;
         if (monthlyTotals.some(v => !Number.isFinite(v) || v < 0 || v > 1e8)) return false;
+        if (monthlyTotals.some(v => v < minAllowedRate || v > maxAllowedRate)) return false;
         if (model.bsSim && (model.bsSim.fehler || model.bsSim.bsRestschuld > 1 || model.bsSim.gapRestschuld > 1)) return false;
         if (model.eigenGapDetails && model.eigenGapDetails.restschuld > 1) return false;
         return true;
@@ -732,7 +736,7 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
         return {
             params: baseParams,
             applied: false,
-            warnungen: ["Für die angegebene Ziel-Monatsrate konnte keine stabile Kalibrierung gefunden werden."]
+            warnungen: [`Für die angegebene Ziel-Monatsrate konnte keine Lösung innerhalb der harten Bandbreite ${formatEUR(minAllowedRate)} bis ${formatEUR(maxAllowedRate)} gefunden werden.`]
         };
     }
 
@@ -748,7 +752,7 @@ function calibrateParamsForTargetMonthlyRate(baseParams) {
 
     const avgRate = best.monthlyTotals.reduce((s, v) => s + v, 0) / (best.monthlyTotals.length || 1);
     const warnungen = [
-        `Ziel-Monatsrate aktiv (lexikografisch): Primär wurden die Gesamtkosten minimiert, danach |Zinsbindung−Zuteilung| und zuletzt die Ratenabweichung. Ergebnis: init. Tilgung ${(best.candidate.initTilgung * 100).toFixed(2)} %, BS-Zuteilung ${best.candidate.bsZuteilungJahre.toFixed(2)} Jahre, Bank-Tilgung ${(best.candidate.bankTilgung * 100).toFixed(2)} %.`
+        `Ziel-Monatsrate aktiv (lexikografisch, harte Bandbreite ${formatEUR(minAllowedRate)} bis ${formatEUR(maxAllowedRate)}): Primär wurden die Gesamtkosten minimiert, danach |Zinsbindung−Zuteilung| und zuletzt die Ratenabweichung. Ergebnis: init. Tilgung ${(best.candidate.initTilgung * 100).toFixed(2)} %, BS-Zuteilung ${best.candidate.bsZuteilungJahre.toFixed(2)} Jahre, Bank-Tilgung ${(best.candidate.bankTilgung * 100).toFixed(2)} %.`
     ];
     if (best.maxDev > targetRate * 0.08) {
         warnungen.push(`Die Zielrate ${formatEUR(targetRate)} kann nicht in allen Phasen exakt gehalten werden (max. Abweichung: ${formatEUR(best.maxDev)}, Ø: ${formatEUR(avgRate)}).`);
