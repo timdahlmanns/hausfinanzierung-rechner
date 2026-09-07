@@ -112,6 +112,8 @@
             <tr class="border-b"><td class="py-1.5 font-medium">Sparguthaben Akkumuliert</td><td id="tblGuthabenBS" class="py-1.5 text-right font-semibold text-amber-600">0 €</td><td id="tblGuthabenEigen" class="py-1.5 text-right font-semibold text-emerald-600">0 €</td></tr>
             <tr class="border-b"><td class="py-1.5 font-medium">BS-Darlehen (Rate / Dauer)</td><td id="tblBSInfo" class="py-1.5 text-right font-medium text-amber-600">0 € (0 J.)</td><td class="py-1.5 text-right text-slate-400">–</td></tr>
             <tr class="border-b"><td class="py-1.5 font-medium">Bank-Anschlusskredit (Lücke)</td><td id="tblGapBS" class="py-1.5 text-right">0 €</td><td id="tblGapEigen" class="py-1.5 text-right">0 €</td></tr>
+            <!-- NEU: Fall A (Zwischenfinanzierung) bzw. Fall C (Zwischenparken) -->
+            <tr id="trZwischenPark" class="border-b bg-amber-50/40 hidden"><td id="tblZwischenParkLabel" class="py-1.5 font-medium">Zwischenphase</td><td id="tblZwischenParkBS" class="py-1.5 text-right font-medium text-amber-700">0 €</td><td id="tblZwischenParkEigen" class="py-1.5 text-right font-medium text-amber-700">0 €</td></tr>
             <tr class="border-b"><td class="py-1.5 font-medium align-top">Bank-Kredit Raten &amp; Dauer</td><td id="tblBankInfoBS" class="py-1.5 text-right font-medium leading-tight">0 €</td><td id="tblBankInfoEigen" class="py-1.5 text-right font-semibold text-emerald-600 align-top">0 € (0 J.)</td></tr>
             <tr class="border-b"><td class="py-1.5 font-medium">Zinsen Anschlussphase</td><td id="tblZinsenAnschlussBS" class="py-1.5 text-right text-red-500">0 €</td><td id="tblZinsenAnschlussEigen" class="py-1.5 text-right text-red-500">0 €</td></tr>
             <!-- NEU -->
@@ -735,6 +737,12 @@ function computeModel(p) {
 
         const totalSparEinzahlungenEigen = R * zinsbindungMonate;
         const zwischenPaidTotal = zwischenResult.schedule.reduce((s, r) => s + r.pmt, 0);
+        // Zinsen, die der Eigenanlage-Pfad während der Zwischenphase (T_zb -> T_z)
+        // auf den bereits final aufgenommenen Bankkredit zahlt – zum direkten
+        // Vergleich mit den Zwischendarlehens-Zinsen des BS-Pfads.
+        const eigenZwischenphaseZinsen = eigenGapDetails.schedule
+            .slice(0, eigenGapDetails.phase1Monate)
+            .reduce((s, r) => s + r.intr, 0);
 
         const totalOutlayBS = pmt_init * zinsbindungMonate + zwischenPaidTotal + totalSparEinzahlungenBS
                              + bsDarlehen + bsSim.bsZinsenTotal + bsSim.bsRestschuld
@@ -761,7 +769,7 @@ function computeModel(p) {
             calculatedRestschuld: restschuldZB, bsGapLoan, bsSim, initialCombinedRateBS, eigenBankLoan, eigenGapDetails,
             totalOutlayBS, totalOutlayEigen, gesamtMonateBS, gesamtMonateEigen, npvPhasesBS, npvPhasesEigen,
             initialPaidInPeriod: pmt_init * zinsbindungMonate, totalSparEinzahlungenEigen,
-            zwischen: { schedule: zwischenResult.schedule, zinsenTotal: zwischenResult.zinsenTotal, monate: zwischenMonate, restschuld: zwischenRestschuld, pmt: pmt_init },
+            zwischen: { schedule: zwischenResult.schedule, zinsenTotal: zwischenResult.zinsenTotal, monate: zwischenMonate, restschuld: zwischenRestschuld, pmt: pmt_init, zinsenTotalEigen: eigenZwischenphaseZinsen },
             park: null
         });
     } else { // Fall C
@@ -831,6 +839,7 @@ function computeModel(p) {
             zwischen: null,
             park: {
                 parkBetragBS, parkFV_BS, sondertilgungBS, sondertilgungMax, zParkMonate,
+                parkBetragEigen: restBetragEigen, parkFV_Eigen: restFV_Eigen, sondertilgungEigen,
                 schedule: generateParkSchedule(parkBetragBS, p.parkZins, zParkMonate)
             }
         });
@@ -1131,6 +1140,25 @@ function calculate() {
     document.getElementById('tblBSInfo').innerText = bsDarlehen > 0.001 ? `${formatEUR(p.bsRateDarlehen)} (${formatDuration(bsSim.bsMonate)})` : "–";
     document.getElementById('tblGapBS').innerText = formatEUR(bsGapLoan);
     document.getElementById('tblGapEigen').innerText = formatEUR(eigenBankLoan);
+
+    // ---------- NEU: Zwischenfinanzierung (Fall A) / Zwischenparken (Fall C) ----------
+    const trZwischenPark = document.getElementById('trZwischenPark');
+    if (model.fall === 'A') {
+        trZwischenPark.classList.remove('hidden');
+        document.getElementById('tblZwischenParkLabel').innerText = `Zwischenfinanz. Zinsen (${formatDuration(model.zwischen.monate)})`;
+        document.getElementById('tblZwischenParkBS').innerText = formatEUR(model.zwischen.zinsenTotal);
+        document.getElementById('tblZwischenParkEigen').innerText = model.zwischen.zinsenTotalEigen > 0.001
+            ? formatEUR(model.zwischen.zinsenTotalEigen) : "– (kein Zwischendarlehen nötig)";
+    } else if (model.fall === 'C') {
+        trZwischenPark.classList.remove('hidden');
+        document.getElementById('tblZwischenParkLabel').innerText = `Zwischenparken, Endwert (${formatDuration(model.park.zParkMonate)})`;
+        document.getElementById('tblZwischenParkBS').innerText = model.park.parkBetragBS > 0.001
+            ? formatEUR(model.park.parkFV_BS) : "– (vollständig sondergetilgt)";
+        document.getElementById('tblZwischenParkEigen').innerText = model.park.parkBetragEigen > 0.001
+            ? formatEUR(model.park.parkFV_Eigen) : "– (vollständig sondergetilgt)";
+    } else {
+        trZwischenPark.classList.add('hidden');
+    }
 
     if (bsGapLoan > 0) {
         let htmlBSBank = `<div class="space-y-0.5">`;
