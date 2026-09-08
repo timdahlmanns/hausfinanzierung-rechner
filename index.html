@@ -41,8 +41,11 @@
     </div>
     <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
       <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Gesamtkosten-Vorteil (nominal)</p>
-      <p id="kpiVorteil" class="text-2xl font-bold mt-1">0 €</p>
-      <p id="kpiVorteilLabel" class="text-xs text-slate-400 mt-1">Vergleich: Mit BS vs. Ohne BS / Ohne sparen</p>
+      <div class="mt-1 grid grid-cols-2 gap-2">
+        <p id="kpiVorteilEigen" class="text-2xl font-bold text-emerald-600">0 €</p>
+        <p id="kpiVorteilNoSave" class="text-2xl font-bold text-slate-700 text-right">0 €</p>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">BS vs. Ohne BS &nbsp;|&nbsp; BS vs. Ohne sparen</p>
     </div>
     <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
       <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Break-Even Bauzins</p>
@@ -52,14 +55,21 @@
     <!-- NEU: Laufzeit -->
     <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
       <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Gesamtlaufzeit-Differenz</p>
-      <p id="kpiLaufzeitDiff" class="text-2xl font-bold text-purple-600 mt-1">0 Mon.</p>
+      <div class="mt-1 grid grid-cols-2 gap-2">
+        <p id="kpiLaufzeitDiffEigen" class="text-2xl font-bold text-emerald-600">0 Mon.</p>
+        <p id="kpiLaufzeitDiffNoSave" class="text-2xl font-bold text-slate-700 text-right">0 Mon.</p>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">BS vs. Ohne BS &nbsp;|&nbsp; BS vs. Ohne sparen</p>
       <p id="kpiLaufzeitSub" class="text-xs text-slate-400 mt-1">BS: 0 J. &nbsp;|&nbsp; Eigen: 0 J. &nbsp;|&nbsp; Ohne sparen: 0 J.</p>
     </div>
     <!-- NEU: NPV -->
     <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
       <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Barwert-Vorteil (NPV)</p>
-      <p id="kpiNpv" class="text-2xl font-bold mt-1">0 €</p>
-      <p id="kpiNpvLabel" class="text-xs text-slate-400 mt-1">Vergleich: Mit BS vs. Ohne BS / Ohne sparen</p>
+      <div class="mt-1 grid grid-cols-2 gap-2">
+        <p id="kpiNpvEigen" class="text-2xl font-bold text-emerald-600">0 €</p>
+        <p id="kpiNpvNoSave" class="text-2xl font-bold text-slate-700 text-right">0 €</p>
+      </div>
+      <p id="kpiNpvLabel" class="text-xs text-slate-400 mt-1">BS vs. Ohne BS &nbsp;|&nbsp; BS vs. Ohne sparen</p>
     </div>
   </div>
 
@@ -151,7 +161,7 @@
         <h3 class="text-base font-bold text-slate-900 flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-blue-500"></span>Schritt 1: Erstfinanzierung &amp; Restschuldberechnung</h3>
         <span class="text-xs text-slate-400 font-medium">Ansparphase</span>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
         <div class="space-y-1.5 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
           <p class="font-bold text-slate-800 mb-1">Erstkredit Eckdaten</p>
           <div class="flex justify-between"><span class="text-slate-500">Kreditsumme:</span><span id="vStep1Summe" class="font-semibold text-slate-800">0 €</span></div>
@@ -163,6 +173,12 @@
           <div class="flex justify-between"><span class="text-slate-600">Verbleibende Restschuld:</span><span id="vStep1Restschuld" class="font-bold text-blue-700">0 €</span></div>
           <div class="flex justify-between"><span class="text-slate-600">Gezahlte Zinsen (Erstkredit):</span><span id="vStep1Zinsen" class="font-semibold text-red-500">0 €</span></div>
           <div class="flex justify-between border-t border-blue-200 pt-1 mt-1"><span class="font-bold text-slate-800">Gesamtrate Ansparphase:</span><span id="vStep1RateGesamtAnspar" class="font-bold text-blue-800">0 € / Mon.</span></div>
+        </div>
+        <div class="space-y-1.5 bg-slate-100/80 p-3.5 rounded-xl border border-slate-300">
+          <p class="font-bold text-slate-900 mb-1">Ohne sparen nach Ansparphase (<span id="vStep1NoSaveJahre">10</span> Jahre)</p>
+          <div class="flex justify-between"><span class="text-slate-700">Verbleibende Restschuld:</span><span id="vStep1NoSaveRestschuld" class="font-bold text-slate-900">0 €</span></div>
+          <div class="flex justify-between"><span class="text-slate-700">Gezahlte Zinsen (Erstkredit):</span><span id="vStep1NoSaveZinsen" class="font-semibold text-red-500">0 €</span></div>
+          <div class="flex justify-between border-t border-slate-400 pt-1 mt-1"><span class="font-bold text-slate-800">Gesamtrate Ansparphase:</span><span id="vStep1NoSaveRateGesamt" class="font-bold text-slate-900">0 € / Mon.</span></div>
         </div>
       </div>
       <details class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
@@ -1071,37 +1087,38 @@ function calculate() {
     document.getElementById('kpiBreakEven').innerText = breakEvenRate === null ? "n/a" : (breakEvenRate * 100).toFixed(2) + " %";
 
     const formatSignedEUR = (v) => `${v >= 0 ? "+" : "−"}${formatEUR(Math.abs(v))}`;
+    const formatSignedDuration = (v) => `${v >= 0 ? "+" : "−"}${formatDuration(Math.abs(v))}`;
+    const setSignedClass = (el, value, positiveClass, negativeClass) => {
+        el.className = "text-2xl font-bold " + (value >= 0 ? positiveClass : negativeClass);
+    };
     const diffNominalEigenVsBS = totalOutlayBS - totalOutlayEigen;
     const diffNominalNoSaveVsBS = totalOutlayBS - totalOutlayNoSave;
-    const nominalBestAlt = diffNominalEigenVsBS >= diffNominalNoSaveVsBS
-        ? { label: 'Ohne BS', diff: diffNominalEigenVsBS, className: 'text-emerald-600' }
-        : { label: 'Ohne sparen', diff: diffNominalNoSaveVsBS, className: 'text-slate-700' };
-    const kpiVorteil = document.getElementById('kpiVorteil');
-    const kpiVorteilLabel = document.getElementById('kpiVorteilLabel');
-    kpiVorteil.innerText = formatSignedEUR(nominalBestAlt.diff);
-    kpiVorteil.className = "text-2xl font-bold mt-1 " + nominalBestAlt.className;
-    kpiVorteilLabel.innerText = `vs. Mit BS → Ohne BS: ${formatSignedEUR(diffNominalEigenVsBS)}, Ohne sparen: ${formatSignedEUR(diffNominalNoSaveVsBS)}`;
+    const kpiVorteilEigen = document.getElementById('kpiVorteilEigen');
+    const kpiVorteilNoSave = document.getElementById('kpiVorteilNoSave');
+    kpiVorteilEigen.innerText = formatSignedEUR(diffNominalEigenVsBS);
+    kpiVorteilNoSave.innerText = formatSignedEUR(diffNominalNoSaveVsBS);
+    setSignedClass(kpiVorteilEigen, diffNominalEigenVsBS, "text-emerald-600", "text-amber-600");
+    setSignedClass(kpiVorteilNoSave, diffNominalNoSaveVsBS, "text-slate-700", "text-amber-600");
 
-    const kpiLaufzeitDiff = document.getElementById('kpiLaufzeitDiff');
     const diffLaufzeitEigenVsBS = gesamtMonateBS - gesamtMonateEigen;
     const diffLaufzeitNoSaveVsBS = gesamtMonateBS - gesamtMonateNoSave;
-    const laufzeitBestAlt = diffLaufzeitEigenVsBS >= diffLaufzeitNoSaveVsBS
-        ? { diff: diffLaufzeitEigenVsBS, className: diffLaufzeitEigenVsBS >= 0 ? 'text-emerald-600' : 'text-amber-600' }
-        : { diff: diffLaufzeitNoSaveVsBS, className: diffLaufzeitNoSaveVsBS >= 0 ? 'text-slate-700' : 'text-amber-600' };
-    kpiLaufzeitDiff.innerText = (laufzeitBestAlt.diff >= 0 ? "+" : "−") + formatDuration(Math.abs(laufzeitBestAlt.diff));
-    kpiLaufzeitDiff.className = "text-2xl font-bold mt-1 " + laufzeitBestAlt.className;
+    const kpiLaufzeitDiffEigen = document.getElementById('kpiLaufzeitDiffEigen');
+    const kpiLaufzeitDiffNoSave = document.getElementById('kpiLaufzeitDiffNoSave');
+    kpiLaufzeitDiffEigen.innerText = formatSignedDuration(diffLaufzeitEigenVsBS);
+    kpiLaufzeitDiffNoSave.innerText = formatSignedDuration(diffLaufzeitNoSaveVsBS);
+    setSignedClass(kpiLaufzeitDiffEigen, diffLaufzeitEigenVsBS, "text-emerald-600", "text-amber-600");
+    setSignedClass(kpiLaufzeitDiffNoSave, diffLaufzeitNoSaveVsBS, "text-slate-700", "text-amber-600");
     document.getElementById('kpiLaufzeitSub').innerText = `BS: ${formatDuration(gesamtMonateBS)} | Eigen: ${formatDuration(gesamtMonateEigen)} | Ohne sparen: ${formatDuration(gesamtMonateNoSave)}`;
 
-    const kpiNpv = document.getElementById('kpiNpv');
-    const kpiNpvLabel = document.getElementById('kpiNpvLabel');
     const diffNpvEigenVsBS = npvBS - npvEigen;
     const diffNpvNoSaveVsBS = npvBS - npvNoSave;
-    const npvBestAlt = diffNpvEigenVsBS >= diffNpvNoSaveVsBS
-        ? { diff: diffNpvEigenVsBS, className: 'text-emerald-600' }
-        : { diff: diffNpvNoSaveVsBS, className: 'text-slate-700' };
-    kpiNpv.innerText = formatSignedEUR(npvBestAlt.diff);
-    kpiNpv.className = "text-2xl font-bold mt-1 " + npvBestAlt.className;
-    kpiNpvLabel.innerText = `vs. Mit BS → Ohne BS: ${formatSignedEUR(diffNpvEigenVsBS)}, Ohne sparen: ${formatSignedEUR(diffNpvNoSaveVsBS)} (d = ${(p.diskontZins * 100).toFixed(1)} %)`;
+    const kpiNpvEigen = document.getElementById('kpiNpvEigen');
+    const kpiNpvNoSave = document.getElementById('kpiNpvNoSave');
+    kpiNpvEigen.innerText = formatSignedEUR(diffNpvEigenVsBS);
+    kpiNpvNoSave.innerText = formatSignedEUR(diffNpvNoSaveVsBS);
+    setSignedClass(kpiNpvEigen, diffNpvEigenVsBS, "text-emerald-600", "text-amber-600");
+    setSignedClass(kpiNpvNoSave, diffNpvNoSaveVsBS, "text-slate-700", "text-amber-600");
+    document.getElementById('kpiNpvLabel').innerText = `BS vs. Ohne BS | BS vs. Ohne sparen (d = ${(p.diskontZins * 100).toFixed(1)} %)`;
 
     // ---------- UI: Vergleichstabelle ----------
     document.getElementById('tblAnsparRateBS').innerText = formatEUR(pmt_anspar_gesamt) + " / M.";
@@ -1173,6 +1190,10 @@ function calculate() {
     document.getElementById('vStep1Restschuld').innerText = formatEUR(model.restschuldZB);
     document.getElementById('vStep1Zinsen').innerText = formatEUR(model.initZinsenTotal);
     document.getElementById('vStep1RateGesamtAnspar').innerText = formatEUR(pmt_anspar_gesamt) + " / Mon.";
+    document.getElementById('vStep1NoSaveJahre').innerText = p.zinsbindungJahre;
+    document.getElementById('vStep1NoSaveRestschuld').innerText = formatEUR(noSaveRestschuldZB);
+    document.getElementById('vStep1NoSaveZinsen').innerText = formatEUR(noSaveInitDetails.zinsenTotal);
+    document.getElementById('vStep1NoSaveRateGesamt').innerText = formatEUR(pmt_anspar_gesamt) + " / Mon.";
 
     // ---------- UI: Schritt 2 ----------
     document.getElementById('vStep2BsRate').innerText = formatEUR(R) + " / Mon.";
