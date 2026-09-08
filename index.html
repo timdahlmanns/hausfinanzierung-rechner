@@ -42,7 +42,7 @@
     <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
       <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Gesamtkosten-Vorteil (nominal)</p>
       <p id="kpiVorteil" class="text-2xl font-bold mt-1">0 €</p>
-      <p id="kpiVorteilLabel" class="text-xs text-slate-400 mt-1">Bestes Modell im 3-Pfad-Vergleich</p>
+      <p id="kpiVorteilLabel" class="text-xs text-slate-400 mt-1">Vergleich: Mit BS vs. Ohne BS / Ohne sparen</p>
     </div>
     <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
       <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Break-Even Bauzins</p>
@@ -59,7 +59,7 @@
     <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
       <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Barwert-Vorteil (NPV)</p>
       <p id="kpiNpv" class="text-2xl font-bold mt-1">0 €</p>
-      <p id="kpiNpvLabel" class="text-xs text-slate-400 mt-1">Bestes Modell im 3-Pfad-Barwertvergleich</p>
+      <p id="kpiNpvLabel" class="text-xs text-slate-400 mt-1">Vergleich: Mit BS vs. Ohne BS / Ohne sparen</p>
     </div>
   </div>
 
@@ -176,6 +176,7 @@
             <div>Z<sub>Erstkredit</sub> = (<span id="calcFormulaInitMonate">0</span> Mon. × <span id="calcFormulaInitRateDup">0 €</span>) - (<span id="calcFormulaInitSum2">0</span> € - <span id="calcFormulaRestschuldEndeDup">0</span> €) = <strong id="calcFormulaInitZinsenGesamt" class="text-red-500">0 €</strong></div>
           </div>
           <div class="pt-2"><p class="font-bold text-slate-900 mb-1">3. Monatlicher Tilgungsplan Erstkredit (<span id="calcFormulaInitJahre">0</span> Jahre):</p><div id="tableContainerStep1"></div></div>
+          <div class="pt-2"><p class="font-bold text-slate-900 mb-1">4. Monatlicher Tilgungsplan Erstkredit (Ohne sparen, gleiche Gesamtrate):</p><div id="tableContainerStep1NoSave"></div></div>
         </div>
       </details>
     </div>
@@ -239,7 +240,7 @@
         <h3 class="text-base font-bold text-slate-900 flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500"></span>Schritt 3: Anschlusstilgung &amp; 2-Phasen-Ratenrechnung</h3>
         <span class="text-xs text-slate-400 font-medium">Tilgungsphase</span>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
         <div class="space-y-1.5 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
           <p class="font-bold text-slate-900 mb-1">Strategie MIT Bausparer (2 Phasen)</p>
           <div class="flex justify-between"><span class="text-slate-600">Phase 1 Rate (BS + Banklücke):</span><span id="vStep3BsRateP1" class="font-semibold text-slate-800">0 € / Mon.</span></div>
@@ -251,6 +252,12 @@
           <div class="flex justify-between"><span class="text-slate-600">Monatliche Bankrate (Budget-Parität):</span><span id="vStep3EigenRate" class="font-bold text-emerald-600">0 € / Mon.</span></div>
           <div class="flex justify-between"><span class="text-slate-600">Bank-Anschlusskredit Netto:</span><span id="vStep3EigenGap" class="font-semibold text-slate-800">0 €</span></div>
           <div class="flex justify-between"><span class="text-slate-600">Gesamtdauer Anschlusstilgung:</span><span id="vStep3EigenDauer" class="font-semibold text-slate-800">0 J. 0 M.</span></div>
+        </div>
+        <div class="space-y-1.5 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+          <p class="font-bold text-slate-900 mb-1">Strategie OHNE sparen</p>
+          <div class="flex justify-between"><span class="text-slate-600">Monatliche Bankrate:</span><span id="vStep3NoSaveRate" class="font-bold text-slate-800">0 € / Mon.</span></div>
+          <div class="flex justify-between"><span class="text-slate-600">Bank-Anschlusskredit:</span><span id="vStep3NoSaveGap" class="font-semibold text-slate-800">0 €</span></div>
+          <div class="flex justify-between"><span class="text-slate-600">Gesamtdauer Anschlusstilgung:</span><span id="vStep3NoSaveDauer" class="font-semibold text-slate-800">0 J. 0 M.</span></div>
         </div>
       </div>
       <details class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
@@ -286,17 +293,19 @@
         <h3 class="text-base font-bold text-slate-900 flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-purple-500"></span>Schritt 4: Gesamtkosten-Synthese &amp; Break-Even</h3>
         <span class="text-xs text-slate-400 font-medium">Auswertung</span>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
         <div class="bg-amber-50/60 p-3.5 rounded-xl border border-amber-200 space-y-1"><p class="font-bold text-amber-900">Gesamtkosten Mit Bausparer</p><p id="vStep4TotBs" class="text-xl font-bold text-slate-900">0 €</p><p class="text-[11px] text-amber-700">Inkl. Erstfinanzierung, Bausparer &amp; Banklücke</p></div>
         <div class="bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-200 space-y-1"><p class="font-bold text-emerald-900">Gesamtkosten Mit Eigenanlage</p><p id="vStep4TotEigen" class="text-xl font-bold text-slate-900">0 €</p><p class="text-[11px] text-emerald-700">Inkl. Erstfinanzierung, Eigenkapital &amp; Bankkredit</p></div>
+        <div class="bg-slate-100/90 p-3.5 rounded-xl border border-slate-300 space-y-1"><p class="font-bold text-slate-900">Gesamtkosten Ohne sparen</p><p id="vStep4TotNoSave" class="text-xl font-bold text-slate-900">0 €</p><p class="text-[11px] text-slate-600">Inkl. Erstfinanzierung &amp; Anschlusskredit</p></div>
       </div>
       <details class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
         <summary class="cursor-pointer font-semibold text-purple-600 hover:text-purple-700 select-none flex items-center justify-between"><span>📐 Ausführliche Formelrechnung &amp; Zwischenschritte anzeigen</span><span class="text-slate-400 text-[10px]">Klicken zum Aufklappen</span></summary>
         <div class="mt-3 space-y-3 pt-2 border-t border-slate-200 text-slate-700">
           <p><strong>Summe aller Aufwendungen im Vergleich:</strong></p>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div class="p-3 bg-amber-50/50 rounded-lg border border-amber-200"><p class="font-bold text-amber-900">Gesamtkosten Mit Bausparer</p><ul class="mt-1 space-y-0.5 text-[11px] text-amber-800"><li>Erstfinanzierung Raten: <span id="calcFormulaTotBsInit">0 €</span></li><li>+ Bauspar Sparraten (ohne Abschlussgebühr): <span id="calcFormulaTotBsSpar">0 €</span></li><li>+ Abschlussgebühr: <span id="calcFormulaTotBsFee">0 €</span></li><li>+ BS-Darlehen + Zinsen: <span id="calcFormulaTotBsDarlehen">0 €</span></li><li>+ Banklücke + Zinsen: <span id="calcFormulaTotBsGap">0 €</span></li><li class="font-bold border-t border-amber-300 pt-1 mt-1 text-slate-900">= Summe: <span id="calcFormulaTotBsSum">0 €</span></li></ul></div>
             <div class="p-3 bg-emerald-50/50 rounded-lg border border-emerald-200"><p class="font-bold text-emerald-900">Gesamtkosten Eigenanlage</p><ul class="mt-1 space-y-0.5 text-[11px] text-emerald-800"><li>Erstfinanzierung Raten: <span id="calcFormulaTotEigenInit">0 €</span></li><li>+ Eigenanlage Sparraten: <span id="calcFormulaTotEigenSpar">0 €</span></li><li>+ Bankkredit + Zinsen: <span id="calcFormulaTotEigenGap">0 €</span></li><li class="font-bold border-t border-emerald-300 pt-1 mt-1 text-slate-900">= Summe: <span id="calcFormulaTotEigenSum">0 €</span></li></ul></div>
+            <div class="p-3 bg-slate-100/90 rounded-lg border border-slate-300"><p class="font-bold text-slate-900">Gesamtkosten Ohne sparen</p><ul class="mt-1 space-y-0.5 text-[11px] text-slate-700"><li>Erstfinanzierung Raten: <span id="calcFormulaTotNoSaveInit">0 €</span></li><li>+ Bankkredit + Zinsen: <span id="calcFormulaTotNoSaveGap">0 €</span></li><li class="font-bold border-t border-slate-400 pt-1 mt-1 text-slate-900">= Summe: <span id="calcFormulaTotNoSaveSum">0 €</span></li></ul></div>
           </div>
           <p class="pt-1"><strong>Kritischer Break-Even Bankzins:</strong> Bei einem Anschluss-Sollzins der Bank von <strong id="calcFormulaBreakEven" class="text-blue-600">0,00 % p.a.</strong> liefern beide Finanzierungswege exakt dieselben Gesamtkosten.</p>
         </div>
@@ -1061,45 +1070,38 @@ function calculate() {
     document.getElementById('kpiAnsparRateGesamt').innerText = formatEUR(pmt_anspar_gesamt) + " / Mon.";
     document.getElementById('kpiBreakEven').innerText = breakEvenRate === null ? "n/a" : (breakEvenRate * 100).toFixed(2) + " %";
 
-    const pathStyles = {
-        'Bauspar-Kombi': 'text-amber-600',
-        'Eigenanlage': 'text-emerald-600',
-        'Ohne sparen': 'text-slate-700'
-    };
-    const nominalRanking = [
-        { label: 'Bauspar-Kombi', value: totalOutlayBS },
-        { label: 'Eigenanlage', value: totalOutlayEigen },
-        { label: 'Ohne sparen', value: totalOutlayNoSave }
-    ].sort((a, b) => a.value - b.value);
-    const nominalBestDiff = Math.max(0, nominalRanking[1].value - nominalRanking[0].value);
+    const formatSignedEUR = (v) => `${v >= 0 ? "+" : "−"}${formatEUR(Math.abs(v))}`;
+    const diffNominalEigenVsBS = totalOutlayBS - totalOutlayEigen;
+    const diffNominalNoSaveVsBS = totalOutlayBS - totalOutlayNoSave;
+    const nominalBestAlt = diffNominalEigenVsBS >= diffNominalNoSaveVsBS
+        ? { label: 'Ohne BS', diff: diffNominalEigenVsBS, className: 'text-emerald-600' }
+        : { label: 'Ohne sparen', diff: diffNominalNoSaveVsBS, className: 'text-slate-700' };
     const kpiVorteil = document.getElementById('kpiVorteil');
     const kpiVorteilLabel = document.getElementById('kpiVorteilLabel');
-    kpiVorteil.innerText = "+" + formatEUR(nominalBestDiff);
-    kpiVorteil.className = "text-2xl font-bold mt-1 " + pathStyles[nominalRanking[0].label];
-    kpiVorteilLabel.innerText = `Bestes Modell: ${nominalRanking[0].label} (vs. ${nominalRanking[1].label})`;
+    kpiVorteil.innerText = formatSignedEUR(nominalBestAlt.diff);
+    kpiVorteil.className = "text-2xl font-bold mt-1 " + nominalBestAlt.className;
+    kpiVorteilLabel.innerText = `vs. Mit BS → Ohne BS: ${formatSignedEUR(diffNominalEigenVsBS)}, Ohne sparen: ${formatSignedEUR(diffNominalNoSaveVsBS)}`;
 
     const kpiLaufzeitDiff = document.getElementById('kpiLaufzeitDiff');
-    const laufzeitRanking = [
-        { label: 'Bauspar-Kombi', value: gesamtMonateBS },
-        { label: 'Eigenanlage', value: gesamtMonateEigen },
-        { label: 'Ohne sparen', value: gesamtMonateNoSave }
-    ].sort((a, b) => a.value - b.value);
-    const laufzeitBestDiffMonate = Math.max(0, laufzeitRanking[1].value - laufzeitRanking[0].value);
-    kpiLaufzeitDiff.innerText = "+" + formatDuration(laufzeitBestDiffMonate);
-    kpiLaufzeitDiff.className = "text-2xl font-bold mt-1 " + pathStyles[laufzeitRanking[0].label];
+    const diffLaufzeitEigenVsBS = gesamtMonateBS - gesamtMonateEigen;
+    const diffLaufzeitNoSaveVsBS = gesamtMonateBS - gesamtMonateNoSave;
+    const laufzeitBestAlt = diffLaufzeitEigenVsBS >= diffLaufzeitNoSaveVsBS
+        ? { diff: diffLaufzeitEigenVsBS, className: diffLaufzeitEigenVsBS >= 0 ? 'text-emerald-600' : 'text-amber-600' }
+        : { diff: diffLaufzeitNoSaveVsBS, className: diffLaufzeitNoSaveVsBS >= 0 ? 'text-slate-700' : 'text-amber-600' };
+    kpiLaufzeitDiff.innerText = (laufzeitBestAlt.diff >= 0 ? "+" : "−") + formatDuration(Math.abs(laufzeitBestAlt.diff));
+    kpiLaufzeitDiff.className = "text-2xl font-bold mt-1 " + laufzeitBestAlt.className;
     document.getElementById('kpiLaufzeitSub').innerText = `BS: ${formatDuration(gesamtMonateBS)} | Eigen: ${formatDuration(gesamtMonateEigen)} | Ohne sparen: ${formatDuration(gesamtMonateNoSave)}`;
 
     const kpiNpv = document.getElementById('kpiNpv');
     const kpiNpvLabel = document.getElementById('kpiNpvLabel');
-    const npvRanking = [
-        { label: 'Bauspar-Kombi', value: npvBS },
-        { label: 'Eigenanlage', value: npvEigen },
-        { label: 'Ohne sparen', value: npvNoSave }
-    ].sort((a, b) => a.value - b.value);
-    const npvBestDiff = Math.max(0, npvRanking[1].value - npvRanking[0].value);
-    kpiNpv.innerText = "+" + formatEUR(npvBestDiff);
-    kpiNpv.className = "text-2xl font-bold mt-1 " + pathStyles[npvRanking[0].label];
-    kpiNpvLabel.innerText = `Barwert-Vorteil ${npvRanking[0].label} (d = ${(p.diskontZins * 100).toFixed(1)} %, vs. ${npvRanking[1].label})`;
+    const diffNpvEigenVsBS = npvBS - npvEigen;
+    const diffNpvNoSaveVsBS = npvBS - npvNoSave;
+    const npvBestAlt = diffNpvEigenVsBS >= diffNpvNoSaveVsBS
+        ? { diff: diffNpvEigenVsBS, className: 'text-emerald-600' }
+        : { diff: diffNpvNoSaveVsBS, className: 'text-slate-700' };
+    kpiNpv.innerText = formatSignedEUR(npvBestAlt.diff);
+    kpiNpv.className = "text-2xl font-bold mt-1 " + npvBestAlt.className;
+    kpiNpvLabel.innerText = `vs. Mit BS → Ohne BS: ${formatSignedEUR(diffNpvEigenVsBS)}, Ohne sparen: ${formatSignedEUR(diffNpvNoSaveVsBS)} (d = ${(p.diskontZins * 100).toFixed(1)} %)`;
 
     // ---------- UI: Vergleichstabelle ----------
     document.getElementById('tblAnsparRateBS').innerText = formatEUR(pmt_anspar_gesamt) + " / M.";
@@ -1187,10 +1189,14 @@ function calculate() {
     document.getElementById('vStep3EigenRate').innerText = formatEUR(eigenGapDetails.pmt) + " / Mon.";
     document.getElementById('vStep3EigenGap').innerText = formatEUR(eigenBankLoan);
     document.getElementById('vStep3EigenDauer').innerText = formatDuration(eigenGapDetails.monate);
+    document.getElementById('vStep3NoSaveRate').innerText = formatEUR(noSaveAnschlussDetails.pmt) + " / Mon.";
+    document.getElementById('vStep3NoSaveGap').innerText = formatEUR(noSaveRestschuldZB);
+    document.getElementById('vStep3NoSaveDauer').innerText = formatDuration(noSaveAnschlussDetails.monate);
 
     // ---------- UI: Schritt 4 ----------
     document.getElementById('vStep4TotBs').innerText = formatEUR(totalOutlayBS);
     document.getElementById('vStep4TotEigen').innerText = formatEUR(totalOutlayEigen);
+    document.getElementById('vStep4TotNoSave').innerText = formatEUR(totalOutlayNoSave);
 
     // ---------- UI: Schritt 5 ----------
     document.getElementById('vStep5NpvBs').innerText = formatEUR(npvBS);
@@ -1199,6 +1205,18 @@ function calculate() {
     document.getElementById('vStep5DauerBs').innerText = "Laufzeit: " + formatDuration(gesamtMonateBS);
     document.getElementById('vStep5DauerEigen').innerText = "Laufzeit: " + formatDuration(gesamtMonateEigen);
     document.getElementById('vStep5DauerNoSave').innerText = "Laufzeit: " + formatDuration(gesamtMonateNoSave);
+    const npvRanking = [
+        { label: 'Bauspar-Kombi', value: npvBS },
+        { label: 'Eigenanlage', value: npvEigen },
+        { label: 'Ohne sparen', value: npvNoSave }
+    ].sort((a, b) => a.value - b.value);
+    const npvBestDiff = Math.max(0, npvRanking[1].value - npvRanking[0].value);
+    const laufzeitRanking = [
+        { label: 'Bauspar-Kombi', value: gesamtMonateBS },
+        { label: 'Eigenanlage', value: gesamtMonateEigen },
+        { label: 'Ohne sparen', value: gesamtMonateNoSave }
+    ].sort((a, b) => a.value - b.value);
+    const laufzeitBestDiffMonate = Math.max(0, laufzeitRanking[1].value - laufzeitRanking[0].value);
     document.getElementById('vStep5NpvDiff').innerText = "+" + formatEUR(npvBestDiff);
     document.getElementById('vStep5NpvDiffLabel').innerText = `${npvRanking[0].label} vs. ${npvRanking[1].label}`;
     document.getElementById('calcFormulaDiskont').innerText = (p.diskontZins * 100).toFixed(2);
@@ -1263,12 +1281,16 @@ function calculate() {
     document.getElementById('calcFormulaTotEigenSpar').innerText = formatEUR(model.totalSparEinzahlungenEigen);
     document.getElementById('calcFormulaTotEigenGap').innerText = formatEUR(eigenBankLoan + eigenGapDetails.zinsen + eigenGapDetails.restschuld);
     document.getElementById('calcFormulaTotEigenSum').innerText = formatEUR(totalOutlayEigen);
+    document.getElementById('calcFormulaTotNoSaveInit').innerText = formatEUR(noSaveInitPaid);
+    document.getElementById('calcFormulaTotNoSaveGap').innerText = formatEUR(noSaveRestschuldZB + noSaveAnschlussDetails.zinsen + noSaveAnschlussDetails.restschuld);
+    document.getElementById('calcFormulaTotNoSaveSum').innerText = formatEUR(totalOutlayNoSave);
     document.getElementById('calcFormulaBreakEven').innerText = breakEvenRate === null
         ? "keinem Zinssatz im Bereich 0–40 %"
         : (breakEvenRate * 100).toFixed(2) + " % p.a.";
 
     // ---------- Tabellen & Charts ----------
     document.getElementById('tableContainerStep1').innerHTML = renderScheduleTable(model.step1Schedule);
+    document.getElementById('tableContainerStep1NoSave').innerHTML = renderScheduleTable(noSaveInitDetails.schedule);
     document.getElementById('tableContainerStep3BSLoan').innerHTML = renderScheduleTable(bsSim.bsSchedule);
     document.getElementById('tableContainerStep3BSGap').innerHTML = renderScheduleTable(bsSim.gapSchedule);
     document.getElementById('tableContainerStep3EigenGap').innerHTML = renderScheduleTable(eigenGapDetails.schedule);
