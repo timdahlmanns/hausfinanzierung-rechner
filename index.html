@@ -49,8 +49,11 @@
     </div>
     <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
       <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Break-Even Bauzins</p>
-      <p id="kpiBreakEven" class="text-2xl font-bold text-blue-600 mt-1">0,00 %</p>
-      <p class="text-xs text-slate-400 mt-1">Kritischer Bank-Sollzins bei Anschluss</p>
+      <div class="mt-1 grid grid-cols-2 gap-2">
+        <p id="kpiBreakEvenEigen" class="text-2xl font-bold text-blue-600">0,00 %</p>
+        <p id="kpiBreakEvenNoSave" class="text-2xl font-bold text-slate-700 text-right">0,00 %</p>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">BS vs. Ohne BS &nbsp;|&nbsp; BS vs. Ohne sparen</p>
     </div>
     <!-- NEU: Laufzeit -->
     <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
@@ -147,7 +150,7 @@
     </div>
     <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
       <h2 class="text-lg font-semibold text-slate-900 mb-1">Break-Even-Kurve im Vollkostenmodell</h2>
-      <p class="text-xs text-slate-500 mb-4">Kritischer Bankzins bei Anschluss in Abhängigkeit von der Anlage-Rendite (Lücken = kein Break-Even im Bereich 0–40 %)</p>
+      <p class="text-xs text-slate-500 mb-4">Kritischer Bankzins bei Anschluss in Abhängigkeit von der Anlage-Rendite für BS vs. Ohne BS und BS vs. Ohne sparen (Lücken = kein Break-Even im Bereich 0–40 %)</p>
       <div class="h-64"><canvas id="lineChart"></canvas></div>
     </div>
   </div>
@@ -323,7 +326,7 @@
             <div class="p-3 bg-emerald-50/50 rounded-lg border border-emerald-200"><p class="font-bold text-emerald-900">Gesamtkosten Eigenanlage</p><ul class="mt-1 space-y-0.5 text-[11px] text-emerald-800"><li>Erstfinanzierung Raten: <span id="calcFormulaTotEigenInit">0 €</span></li><li>+ Eigenanlage Sparraten: <span id="calcFormulaTotEigenSpar">0 €</span></li><li>+ Bankkredit + Zinsen: <span id="calcFormulaTotEigenGap">0 €</span></li><li class="font-bold border-t border-emerald-300 pt-1 mt-1 text-slate-900">= Summe: <span id="calcFormulaTotEigenSum">0 €</span></li></ul></div>
             <div class="p-3 bg-slate-100/90 rounded-lg border border-slate-300"><p class="font-bold text-slate-900">Gesamtkosten Ohne sparen</p><ul class="mt-1 space-y-0.5 text-[11px] text-slate-700"><li>Erstfinanzierung Raten: <span id="calcFormulaTotNoSaveInit">0 €</span></li><li>+ Bankkredit + Zinsen: <span id="calcFormulaTotNoSaveGap">0 €</span></li><li class="font-bold border-t border-slate-400 pt-1 mt-1 text-slate-900">= Summe: <span id="calcFormulaTotNoSaveSum">0 €</span></li></ul></div>
           </div>
-          <p class="pt-1"><strong>Kritischer Break-Even Bankzins:</strong> Bei einem Anschluss-Sollzins der Bank von <strong id="calcFormulaBreakEven" class="text-blue-600">0,00 % p.a.</strong> liefern beide Finanzierungswege exakt dieselben Gesamtkosten.</p>
+          <p class="pt-1"><strong>Kritischer Break-Even Bankzins:</strong> BS vs. Ohne BS: <strong id="calcFormulaBreakEvenEigen" class="text-blue-600">0,00 % p.a.</strong> &nbsp;|&nbsp; BS vs. Ohne sparen: <strong id="calcFormulaBreakEvenNoSave" class="text-slate-700">0,00 % p.a.</strong>.</p>
         </div>
       </details>
     </div>
@@ -827,9 +830,23 @@ function computeModel(p) {
    Break-Even: sucht den Bankzins, bei dem beide Pfade gleich teuer
    sind (Vorzeichenwechsel-Prüfung, sonst null).
    ============================================================ */
-function calculateBreakEvenForVollkosten(baseParams) {
+function computeNoSavePath(p, pmtAnsparGesamt, zinsbindungMonate) {
+    const noSaveInitDetails = runFixedTermLoan(p.initSumme, p.initZins, pmtAnsparGesamt, zinsbindungMonate);
+    const noSaveRestschuldZB = noSaveInitDetails.restschuld;
+    const noSaveAnschlussDetails = runBankLoanDetailsByPmt(noSaveRestschuldZB, p.bankBauzins, pmtAnsparGesamt);
+    const noSaveInitPaid = noSaveInitDetails.schedule.reduce((sum, row) => sum + row.pmt, 0);
+    const totalOutlayNoSave = noSaveInitPaid + noSaveRestschuldZB + noSaveAnschlussDetails.zinsen + noSaveAnschlussDetails.restschuld;
+    return { noSaveInitDetails, noSaveRestschuldZB, noSaveAnschlussDetails, noSaveInitPaid, totalOutlayNoSave };
+}
+
+function calculateBreakEvenForVollkosten(baseParams, compareMode = 'eigen') {
     const diffAt = (i) => {
-        const m = computeModel(Object.assign({}, baseParams, { bankBauzins: i }));
+        const params = Object.assign({}, baseParams, { bankBauzins: i });
+        const m = computeModel(params);
+        if (compareMode === 'nosave') {
+            const noSave = computeNoSavePath(params, m.pmt_anspar_gesamt, m.zinsbindungMonate);
+            return noSave.totalOutlayNoSave - m.totalOutlayBS;
+        }
         return m.totalOutlayEigen - m.totalOutlayBS;
     };
     let low = 0.0001, high = 0.40;
@@ -902,21 +919,31 @@ function updateBarChart(initialPaidBS, initialPaidEigen, sparratenBS, sparratenE
     });
 }
 
-function updateLineChart(labels, dataPoints) {
+function updateLineChart(labels, dataPointsEigen, dataPointsNoSave) {
     const ctx = document.getElementById('lineChart').getContext('2d');
     if (lineChart) lineChart.destroy();
     lineChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
-            datasets: [{
-                label: 'Kritischer Bankzins (%)',
-                data: dataPoints,
-                borderColor: '#2563eb',
-                backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                fill: true, tension: 0.3, pointRadius: 4, pointHoverRadius: 6,
-                spanGaps: false
-            }]
+            datasets: [
+                {
+                    label: 'BS vs. Ohne BS',
+                    data: dataPointsEigen,
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.12)',
+                    fill: false, tension: 0.3, pointRadius: 4, pointHoverRadius: 6,
+                    spanGaps: false
+                },
+                {
+                    label: 'BS vs. Ohne sparen',
+                    data: dataPointsNoSave,
+                    borderColor: '#334155',
+                    backgroundColor: 'rgba(51, 65, 85, 0.12)',
+                    fill: false, tension: 0.3, pointRadius: 4, pointHoverRadius: 6,
+                    spanGaps: false
+                }
+            ]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
@@ -924,7 +951,7 @@ function updateLineChart(labels, dataPoints) {
                 x: { title: { display: true, text: 'Netto-Rendite Eigenanlage (% p.a.)', font: { size: 10 } } },
                 y: { title: { display: true, text: 'Kritischer Bankzins (% p.a.)', font: { size: 10 } }, ticks: { callback: v => v.toFixed(1) + ' %' } }
             },
-            plugins: { tooltip: { callbacks: { label: c => c.raw === null ? 'Kein Break-Even' : 'Kritischer Bankzins: ' + c.raw.toFixed(2) + ' %' } } }
+            plugins: { tooltip: { callbacks: { label: c => c.raw === null ? `${c.dataset.label}: Kein Break-Even` : `${c.dataset.label}: ${c.raw.toFixed(2)} %` } } }
         }
     });
 }
@@ -1035,22 +1062,28 @@ function calculate() {
     const fvEigen = model.fvEigenFinal;
     const totalSparEinzahlungenBS = model.totalSparEinzahlungenBS;
     const totalSparEinzahlungenEigen = model.totalSparEinzahlungenEigen;
-    const noSaveInitDetails = runFixedTermLoan(p.initSumme, p.initZins, pmt_anspar_gesamt, zinsbindungMonate);
-    const noSaveRestschuldZB = noSaveInitDetails.restschuld;
-    const noSaveAnschlussDetails = runBankLoanDetailsByPmt(noSaveRestschuldZB, p.bankBauzins, pmt_anspar_gesamt);
-    const noSaveInitPaid = noSaveInitDetails.schedule.reduce((sum, row) => sum + row.pmt, 0);
-    const totalOutlayNoSave = noSaveInitPaid + noSaveRestschuldZB + noSaveAnschlussDetails.zinsen + noSaveAnschlussDetails.restschuld;
+    const noSave = computeNoSavePath(p, pmt_anspar_gesamt, zinsbindungMonate);
+    const noSaveInitDetails = noSave.noSaveInitDetails;
+    const noSaveRestschuldZB = noSave.noSaveRestschuldZB;
+    const noSaveAnschlussDetails = noSave.noSaveAnschlussDetails;
+    const noSaveInitPaid = noSave.noSaveInitPaid;
+    const totalOutlayNoSave = noSave.totalOutlayNoSave;
 
     // ---------- Break-Even ----------
-    const breakEvenRate = calculateBreakEvenForVollkosten(p);
+    const breakEvenRateEigen = calculateBreakEvenForVollkosten(p, 'eigen');
+    const breakEvenRateNoSave = calculateBreakEvenForVollkosten(p, 'nosave');
 
     // ---------- Break-Even-Kurve ----------
     const curveLabels = [];
-    const curveData = [];
+    const curveDataEigen = [];
+    const curveDataNoSave = [];
     for (let y = 0.0; y <= 0.0601; y += 0.005) {
         curveLabels.push((y * 100).toFixed(1) + " %");
-        const be = calculateBreakEvenForVollkosten(Object.assign({}, p, { eigenRendite: y }));
-        curveData.push(be === null ? null : be * 100);
+        const baseAtY = Object.assign({}, p, { eigenRendite: y });
+        const beEigen = calculateBreakEvenForVollkosten(baseAtY, 'eigen');
+        const beNoSave = calculateBreakEvenForVollkosten(baseAtY, 'nosave');
+        curveDataEigen.push(beEigen === null ? null : beEigen * 100);
+        curveDataNoSave.push(beNoSave === null ? null : beNoSave * 100);
     }
 
     // ---------- Laufzeit & Barwert ----------
@@ -1084,7 +1117,8 @@ function calculate() {
     document.getElementById('kpiRestschuld').innerText = formatEUR(calculatedRestschuld);
     document.getElementById('kpiRestschuldSub').innerText = `Offen nach ${p.zinsbindungJahre} Jahren Zinsbindung`;
     document.getElementById('kpiAnsparRateGesamt').innerText = formatEUR(pmt_anspar_gesamt) + " / Mon.";
-    document.getElementById('kpiBreakEven').innerText = breakEvenRate === null ? "n/a" : (breakEvenRate * 100).toFixed(2) + " %";
+    document.getElementById('kpiBreakEvenEigen').innerText = breakEvenRateEigen === null ? "n/a" : (breakEvenRateEigen * 100).toFixed(2) + " %";
+    document.getElementById('kpiBreakEvenNoSave').innerText = breakEvenRateNoSave === null ? "n/a" : (breakEvenRateNoSave * 100).toFixed(2) + " %";
 
     const formatSignedEUR = (v) => `${v >= 0 ? "+" : "−"}${formatEUR(Math.abs(v))}`;
     const formatSignedDuration = (v) => `${v >= 0 ? "+" : "−"}${formatDuration(Math.abs(v))}`;
@@ -1305,9 +1339,12 @@ function calculate() {
     document.getElementById('calcFormulaTotNoSaveInit').innerText = formatEUR(noSaveInitPaid);
     document.getElementById('calcFormulaTotNoSaveGap').innerText = formatEUR(noSaveRestschuldZB + noSaveAnschlussDetails.zinsen + noSaveAnschlussDetails.restschuld);
     document.getElementById('calcFormulaTotNoSaveSum').innerText = formatEUR(totalOutlayNoSave);
-    document.getElementById('calcFormulaBreakEven').innerText = breakEvenRate === null
+    document.getElementById('calcFormulaBreakEvenEigen').innerText = breakEvenRateEigen === null
         ? "keinem Zinssatz im Bereich 0–40 %"
-        : (breakEvenRate * 100).toFixed(2) + " % p.a.";
+        : (breakEvenRateEigen * 100).toFixed(2) + " % p.a.";
+    document.getElementById('calcFormulaBreakEvenNoSave').innerText = breakEvenRateNoSave === null
+        ? "keinem Zinssatz im Bereich 0–40 %"
+        : (breakEvenRateNoSave * 100).toFixed(2) + " % p.a.";
 
     // ---------- Tabellen & Charts ----------
     document.getElementById('tableContainerStep1').innerHTML = renderScheduleTable(model.step1Schedule);
@@ -1321,7 +1358,7 @@ function calculate() {
     const sparrateBSBar = Math.max(0, totalSparEinzahlungenBS - model.fee);
     const sparrateEigenBar = totalSparEinzahlungenEigen;
     updateBarChart(model.initialPaidInPeriod, model.initialPaidInPeriod, sparrateBSBar, sparrateEigenBar, model.fee, bsDarlehen, bsSim.bsZinsenTotal + bsSim.gapZinsenTotal, zwischenAufwandBar, bsGapLoan, eigenBankLoan, eigenGapDetails.zinsen);
-    updateLineChart(curveLabels, curveData);
+    updateLineChart(curveLabels, curveDataEigen, curveDataNoSave);
 }
 
 const inputIds = [
